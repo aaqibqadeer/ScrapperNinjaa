@@ -108,7 +108,13 @@ export function LeadDetailDrawer({
   const emails = lead?.emails ?? [];
   const city = lead?.address?.city ?? null;
   const state = lead?.address?.state ?? null;
-  const location = [city, state].filter(Boolean).join(", ");
+  // Fall back to the raw address line: a capture often has the full string
+  // before the (AI) normalization pass has split it into city/state.
+  const location =
+    [city, state].filter(Boolean).join(", ") || (lead?.address?.raw ?? "");
+  const socials = Object.entries(lead?.socials ?? {}).filter(
+    (entry): entry is [string, string] => Boolean(entry[1]),
+  );
 
   return (
     <DetailDrawer
@@ -172,7 +178,35 @@ export function LeadDetailDrawer({
               )}
             </Field>
             <Field label="Website status">{lead.websiteStatus}</Field>
+            <Field label="Hours">{lead.hours || "—"}</Field>
+            <Field label="Plus code">{lead.plusCode || "—"}</Field>
           </section>
+
+          {lead.description && (
+            <section>
+              <Field label="Description">{lead.description}</Field>
+            </section>
+          )}
+
+          {socials.length > 0 && (
+            <section>
+              <Field label="Social profiles">
+                <span className="flex flex-col gap-1">
+                  {socials.map(([platform, url]) => (
+                    <a
+                      key={platform}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {platform}
+                    </a>
+                  ))}
+                </span>
+              </Field>
+            </section>
+          )}
 
           {lead.offerLine && (
             <section>

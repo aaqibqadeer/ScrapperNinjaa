@@ -552,6 +552,9 @@ export const leadSchema = z.object({
   businessName: z.string().min(1),
   category: z.string().nullable().optional(),
   categories: z.array(z.string()).default([]),
+  /** The business's own blurb (profile bio / "about" text) as published by the
+   * source — captured, not written by the user (that's `notes`). */
+  description: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   phoneE164: z.string().nullable().optional(),
   website: z.string().nullable().optional(),

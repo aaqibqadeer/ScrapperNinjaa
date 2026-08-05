@@ -39,6 +39,9 @@ interface IngestResponse {
   rescued: number;
 }
 
+/** Sent when a page yielded no name; the server's rescue pass replaces it. */
+const PLACEHOLDER_NAME = "Untitled capture";
+
 /** First non-empty line of a snippet, for a businessName fallback. */
 function firstLine(snippet: string | null | undefined): string | null {
   if (!snippet) return null;
@@ -49,31 +52,43 @@ function firstLine(snippet: string | null | undefined): string | null {
   return null;
 }
 
+/** Clip a value to the server's max length; empty becomes null. */
+function clip(value: string | null | undefined, max: number): string | null {
+  const text = value?.trim();
+  return text ? text.slice(0, max) : null;
+}
+
 /** Map one queued record to an ingest RECORD (batch-level fields excluded). */
 function toIngestRecord(record: QueueRecord): Record<string, unknown> {
   const p = record.payload;
   // The server requires a non-empty businessName; generic/manual snippets have
   // none, so fall back to the snippet's first line (the rescue pass replaces it).
+  // Page metadata is untrusted input — clip it to the ingest schema's limits so
+  // one long title can't 400 the whole batch.
   const businessName =
-    p.businessName?.trim() || firstLine(p.rawSnippet) || "Untitled capture";
+    clip(p.businessName, 300) ?? firstLine(p.rawSnippet) ?? PLACEHOLDER_NAME;
   return {
     clientCaptureId: record.clientId,
     businessName,
-    category: p.category ?? null,
+    category: clip(p.category, 200),
     categories: p.categories ?? [],
-    phone: p.phone ?? null,
-    website: p.website ?? null,
+    description: clip(p.description, 5_000),
+    ownerName: clip(p.ownerName, 300),
+    phone: clip(p.phone, 100),
+    website: clip(p.website, 2_000),
+    emails: (p.emails ?? []).filter((e) => e.length <= 320).slice(0, 50),
+    socials: p.socials ?? {},
     address: p.address ?? {},
     lat: p.lat ?? null,
     lng: p.lng ?? null,
     rating: p.rating ?? null,
     reviewCount: p.reviewCount ?? null,
     priceLevel: p.priceLevel ?? null,
-    hours: p.hours ?? null,
-    plusCode: p.plusCode ?? null,
-    sourceUrl: p.sourceUrl ?? null,
+    hours: clip(p.hours, 2_000),
+    plusCode: clip(p.plusCode, 100),
+    sourceUrl: clip(p.sourceUrl, 2_000),
     parseIssues: p.parseIssues ?? [],
-    rawSnippet: p.rawSnippet ?? null,
+    rawSnippet: clip(p.rawSnippet, 20_000),
   };
 }
 

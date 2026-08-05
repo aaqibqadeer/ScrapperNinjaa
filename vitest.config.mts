@@ -6,7 +6,10 @@
  * plain vite-node in a Node environment. The `@/` alias mirrors the single
  * `tsconfig.json` path (`"@/*": ["./*"]`) so test imports match app imports.
  *
- * The extension has its own package.json / build and is excluded here.
+ * The extension has its own package.json / build, so only its PURE modules are
+ * covered here (the capture parsers in `scrapers/text.ts`) — they import no
+ * chrome/DOM API, and they are the only place extension harvesting is verified
+ * at all, since DOM capture itself is not exercised in CI.
  */
 
 import { fileURLToPath } from "node:url";
@@ -22,6 +25,6 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.ts"],
-    exclude: ["node_modules/**", "extension/**", ".next/**"],
+    exclude: ["**/node_modules/**", "extension/dist/**", ".next/**"],
   },
 });

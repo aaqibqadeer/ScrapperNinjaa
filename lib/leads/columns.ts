@@ -101,6 +101,20 @@ export const LEAD_COLUMNS: readonly LeadColumnDef[] = [
     filterField: "category",
   },
   {
+    // Captured blurb (a social bio, an "about" paragraph). Read-only: it is the
+    // source's words, not the user's — `notes` is the editable field.
+    key: "description",
+    label: "Description",
+    type: "text",
+    sortable: false,
+    filterable: true,
+    editable: false,
+    exportable: true,
+    defaultVisible: false,
+    sortField: "description",
+    filterField: "description",
+  },
+  {
     key: "city",
     label: "City",
     type: "text",

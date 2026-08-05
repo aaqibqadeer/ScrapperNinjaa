@@ -24,11 +24,20 @@ import { extractJson, generateJsonForTask, clip } from "./generate";
  * a snippet the model genuinely can't read a phone out of should return null,
  * not a hallucinated value. `address` accepts either a single raw string or the
  * structured address object.
+ *
+ * The field list mirrors what a capture can be missing. It covers more than
+ * name/phone/website/address because the pages that need rescuing most (social
+ * profiles, tier-d captures) publish their category and bio as plain text and
+ * nothing else — extracting only four fields left those rows effectively empty.
  */
 export const rescuedRecordSchema = z.object({
   businessName: z.string().nullable().default(null),
+  category: z.string().nullable().default(null),
+  description: z.string().nullable().default(null),
+  ownerName: z.string().nullable().default(null),
   phone: z.string().nullable().default(null),
   website: z.string().nullable().default(null),
+  emails: z.array(z.string()).default([]),
   address: z
     .union([z.string(), leadAddressSchema])
     .nullable()
@@ -54,10 +63,18 @@ function rescuePrompt(snippet: string): string {
 Return exactly this JSON object:
 {
   "businessName": string|null,
+  "category": string|null,
+  "description": string|null,
+  "ownerName": string|null,
   "phone": string|null,
   "website": string|null,
+  "emails": string[],
   "address": string|null
 }
+- category: what the business DOES ("plumber", "dental clinic"), never a rating,
+  a review count or a follower count.
+- description: the business's own blurb / bio, trimmed to one paragraph.
+- emails: every address in the text, or [].
 Use null for anything not present. Do NOT invent values — a field you cannot
 read from the text MUST be null.
 

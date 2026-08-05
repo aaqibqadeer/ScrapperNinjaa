@@ -21,6 +21,7 @@ import type { Lead, UpdateLead } from "@/lib/db/schema";
 export const MERGEABLE_FIELDS = [
   "businessName",
   "category",
+  "description",
   "phone",
   "phoneE164",
   "website",

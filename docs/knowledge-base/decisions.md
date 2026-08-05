@@ -5,6 +5,28 @@
 > Recent phases stay here; older entries live in
 > [`decisions-archive.md`](./decisions-archive.md). Keep this file small.
 
+## 2026-08-05 — Capture maps fields BY SHAPE, not by selector position
+
+Google Maps fast/deep capture was writing review counts into `category` and
+`address`, reading `4` as the review count of "4.6 stars 21 Reviews", harvesting
+every card twice, and reading the detail panel off the RESULTS list (Maps mounts
+both as `div[role="main"]`, list first) so deep mode added nothing. Rules now:
+
+- **Validate before mapping.** A selector matching is not enough — `looksLike*`
+  / `classifyCardInfo` (`scrapers/text.ts`, pure + unit-tested) decide what a
+  string is. A rotted selector yields `null`, never a wrong value.
+- **Packs augment, they don't replace.** `sel()` returns pack selectors THEN the
+  bundled fallbacks, so a stale server pack degrades instead of blanking a field.
+- **Deep mode verifies identity.** The detail pass waits for the panel to switch
+  to the clicked business and drops the patch when the name doesn't match —
+  a failed click loses data rather than mixing two businesses.
+- **Tier-d capture reads metadata, not markup** (`scrapers/page-meta.ts`):
+  Open Graph + JSON-LD + `mailto:`/`tel:`/link-in-bio. Instagram et al. render
+  through obfuscated classes but publish this for search engines.
+- **Rescue fills gaps only** — it never overwrites what the DOM already gave
+  (except the `"Untitled capture"` placeholder).
+- New `leads.description` = the source's blurb; `notes` stays the user's field.
+
 ## 2026-08-05 — ScrapperNinja-only fork (drop ApplyNinjaa)
 
 This repo is **ScrapperNinja-only**, not a two-product deployment:

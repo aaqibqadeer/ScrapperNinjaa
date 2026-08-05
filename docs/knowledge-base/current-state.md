@@ -23,13 +23,28 @@ _Last updated: 2026-08-05 — **ScrapperNinja-only fork**: removed ApplyNinjaa j
 - **Platform admin** — users, subscriptions, plans, source packs, audit, settings
 - **Seed** — demo leads/campaigns/views/source packs/offer prompts + 4 plans (lead/campaign/AI limits)
 
+## Capture field mapping (2026-08-05 fix)
+
+Adapters map a field only when the text passes a shape check
+(`scrapers/text.ts`); selector packs are appended to — not replaced by — the
+bundled fallbacks. Maps fast mode now also yields phone/website/hours/lat-lng;
+deep mode verifies the panel belongs to the clicked result. Tier-d (Instagram,
+LinkedIn, …) captures via `scrapers/page-meta.ts` (Open Graph + JSON-LD +
+mailto/tel/link-in-bio). AI rescue fills gaps only, never overwrites.
+
 ## Verification
 
 - `npm run typecheck`, `npm run lint`, `npm test` pass with `NEXT_PUBLIC_PRODUCT=scrapperninja`
+  — except **2 pre-existing failures** in `lib/leads/columns.test.ts` (the
+  editable-column assertions drifted from the catalog; unrelated to capture)
 - `npm run build:extension` produces `extension/dist/scrapperninja`
 - `next build` with `SKIP_ENV_VALIDATION=1`
 
 ## Deferred / rough edges
 
-- Extension DOM harvesting and Phase 3 jobs not browser-verified in CI
+- Capture parsers are unit-tested (`scrapers/text.test.ts`); the DOM adapters
+  themselves are still not browser-verified in CI, nor are Phase 3 jobs
+- Orgs seeded before 2026-08-05 keep the old `google-maps` source pack (seed is
+  create-only). Harmless — the bundled fallbacks now cover it — but re-seeding
+  or editing it in `/admin/source-packs` restores full selector coverage.
 - No automated E2E — manual QA in `docs/guides/testing-guide.md` (ScrapperNinja cases)

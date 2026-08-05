@@ -44,10 +44,23 @@ describe("parseRescueResponse", () => {
     const out = parseRescueResponse("{}");
     expect(out).toEqual({
       businessName: null,
+      category: null,
+      description: null,
+      ownerName: null,
       phone: null,
       website: null,
+      emails: [],
       address: null,
     });
+  });
+
+  it("parses the fields a social-profile capture depends on", () => {
+    const out = parseRescueResponse(
+      '{"businessName":"Acme Plumbing","category":"Plumber","description":"Austin\'s 24/7 emergency plumber","emails":["hello@acme.com"]}',
+    );
+    expect(out.category).toBe("Plumber");
+    expect(out.description).toBe("Austin's 24/7 emergency plumber");
+    expect(out.emails).toEqual(["hello@acme.com"]);
   });
 
   it("accepts a structured address object", () => {

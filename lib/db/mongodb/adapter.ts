@@ -216,6 +216,7 @@ interface LeadDoc {
   business_name: string;
   category: string | null;
   categories: string[];
+  description: string | null;
   phone: string | null;
   phone_e164: string | null;
   website: string | null;
@@ -600,6 +601,7 @@ const leadSchemaMongo = new Schema<LeadDoc>(
     business_name: { type: String, required: true },
     category: { type: String, default: null },
     categories: { type: [String], default: [] },
+    description: { type: String, default: null },
     phone: { type: String, default: null },
     phone_e164: { type: String, default: null },
     website: { type: String, default: null },
@@ -1072,6 +1074,7 @@ function toLead(doc: LeadDoc): Lead {
     businessName: doc.business_name,
     category: doc.category ?? null,
     categories: doc.categories ?? [],
+    description: doc.description ?? null,
     phone: doc.phone ?? null,
     phoneE164: doc.phone_e164 ?? null,
     website: doc.website ?? null,
@@ -1288,6 +1291,8 @@ function leadWriteDoc(patch: UpdateLead): Record<string, unknown> {
   if (patch.businessName !== undefined) u.business_name = patch.businessName;
   if (patch.category !== undefined) u.category = patch.category ?? null;
   if (patch.categories !== undefined) u.categories = patch.categories;
+  if (patch.description !== undefined)
+    u.description = patch.description ?? null;
   if (patch.phone !== undefined) u.phone = patch.phone ?? null;
   if (patch.phoneE164 !== undefined) u.phone_e164 = patch.phoneE164 ?? null;
   if (patch.website !== undefined) u.website = patch.website ?? null;

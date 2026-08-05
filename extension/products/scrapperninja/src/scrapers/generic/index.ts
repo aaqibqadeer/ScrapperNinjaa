@@ -11,6 +11,7 @@
  */
 
 import { cleanText, sleep } from "../dom";
+import { readPageMeta } from "../page-meta";
 import type { HarvestContext, RawRecord, SourceAdapter } from "../types";
 
 /** A coarse structural signature so siblings of the same "kind" group together. */
@@ -92,9 +93,23 @@ export const genericAdapter: SourceAdapter = {
   },
 
   async capturePage(ctx: HarvestContext): Promise<RawRecord> {
+    // A single-page capture is a business page, not a result list: read the
+    // metadata the page publishes about itself before falling back to AI.
+    const meta = readPageMeta(ctx.sourceUrl || location.href);
     const main =
       document.querySelector("main") ?? document.body ?? document.documentElement;
     return {
+      businessName: meta.businessName,
+      category: meta.category,
+      description: meta.description,
+      phone: meta.phone,
+      website: meta.website,
+      emails: meta.emails,
+      socials: meta.socials,
+      ownerName: meta.ownerName,
+      address: meta.address ?? undefined,
+      lat: meta.lat,
+      lng: meta.lng,
       rawSnippet: blockText(main),
       parseIssues: ["needs_ai_extract"],
       sourceUrl: ctx.sourceUrl,

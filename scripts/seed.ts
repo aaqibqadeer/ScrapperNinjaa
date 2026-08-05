@@ -871,23 +871,36 @@ async function seedSourcePacks(): Promise<void> {
     // Keys mirror the extension's bundled fallback (google-maps/selectors.ts);
     // each value is a comma-separated list the adapter tries in order, so
     // data-item-id / aria-label variants survive Google's class-name churn.
+    // The adapter appends its bundled fallbacks after these and validates what
+    // a selector matched before mapping it, so a rotted entry here degrades to
+    // an empty field instead of a wrong one.
     selectors: {
       resultItem:
-        'div[role="feed"] > div > div[jsaction], a.hfpxzc, div[role="feed"] a[href*="/maps/place/"]',
-      name: 'div.fontHeadlineSmall, [role="heading"], a.hfpxzc[aria-label]',
-      category: 'div.fontBodyMedium > div:nth-of-type(1) > span:nth-of-type(1)',
+        'div[role="feed"] > div > div[jsaction], div.Nv2PK, div[role="feed"] a[href*="/maps/place/"]',
+      name: 'div.fontHeadlineSmall, .qBF1Pd, [role="heading"], a.hfpxzc[aria-label]',
+      // Only a hint: the card's category is picked out of the info rows by
+      // shape, because Maps renders category/address/hours in one unlabelled
+      // stack whose order varies per result.
+      category: "div.fontBodyMedium > div:nth-of-type(1) > span:nth-of-type(1)",
+      // This aria-label holds BOTH numbers ("4.6 stars 21 Reviews").
       rating:
-        "span[role='img'][aria-label*='star'], span[aria-label$='stars'], span.fontDisplayLarge",
-      reviewCount: "span[aria-label*='review'], span[aria-label*='Review']",
+        "span[role='img'][aria-label*='star'], span[aria-label$='stars'], .MW4etd",
+      reviewCount:
+        ".UY7F9, span[aria-label*='review'], span[aria-label*='Review']",
+      cardInfo: ".W4Efsd",
+      cardWebsite:
+        "a[data-value='Website'], a[aria-label^='Visit'], a.lcr4fd[href^='http']",
       address:
         "button[data-item-id='address'], button[aria-label^='Address']",
       link: "a.hfpxzc, a[href*='/maps/place/']",
       phone: "button[data-item-id^='phone'], button[aria-label^='Phone']",
       website:
         "a[data-item-id='authority'], a[aria-label^='Website']",
-      hours: "div[jsaction*='openhours'], [aria-label*='Hours']",
+      hours: "div[jsaction*='openhours'], [data-item-id='oh'], [aria-label*='Hours']",
       plusCode:
         "button[data-item-id='oloc'], button[aria-label^='Plus code']",
+      detailCategory:
+        "button[jsaction*='category'], button.DkEaL, [jsaction*='pane.rating.category']",
     },
     notes:
       "Bundled fallback lives in the extension; edit this pack to fix a Google DOM change without a new build.",

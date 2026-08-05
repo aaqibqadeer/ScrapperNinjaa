@@ -38,8 +38,14 @@ export interface RawRecord {
   businessName?: string | null;
   category?: string | null;
   categories?: string[];
+  /** Bio / about text — the only real content a social profile publishes. */
+  description?: string | null;
+  ownerName?: string | null;
   phone?: string | null;
   website?: string | null;
+  emails?: string[];
+  /** Profile URLs by platform (facebook, instagram, linkedin, x, …). */
+  socials?: Record<string, string | null>;
   address?: RawAddress;
   rating?: number | null;
   reviewCount?: number | null;

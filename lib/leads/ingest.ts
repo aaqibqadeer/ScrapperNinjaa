@@ -23,6 +23,7 @@ import type { Session } from "@/lib/auth/types";
 import {
   db,
   leadAddressSchema,
+  leadSocialsSchema,
   leadSourceTypeSchema,
   type Lead,
   type NewLead,
@@ -36,6 +37,8 @@ import { assertScraperEnabled, requireOrg, ScraperError } from "./service";
 
 /** Max flagged records rescued inline during a single ingest (decision #6). */
 export const INLINE_RESCUE_CAP = 25;
+/** The name the extension sends when a page yielded none — safe to replace. */
+const PLACEHOLDER_NAME = "Untitled capture";
 /** Default ceiling for a batch rescue call (the queue button). */
 const DEFAULT_BATCH_RESCUE_LIMIT = 25;
 const MAX_BATCH_RESCUE_LIMIT = 100;
@@ -51,8 +54,13 @@ export const ingestRecordSchema = z.object({
   businessName: z.string().min(1).max(300),
   category: z.string().max(200).nullable().optional(),
   categories: z.array(z.string().max(200)).max(20).optional(),
+  /** Profile bio / "about" text — what a social capture actually carries. */
+  description: z.string().max(5000).nullable().optional(),
+  ownerName: z.string().max(300).nullable().optional(),
   phone: z.string().max(100).nullable().optional(),
   website: z.string().max(2000).nullable().optional(),
+  emails: z.array(z.string().max(320)).max(50).optional(),
+  socials: leadSocialsSchema.optional(),
   address: leadAddressSchema.optional(),
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
@@ -127,6 +135,7 @@ function toNewLead(
     businessName: record.businessName,
     category: record.category ?? null,
     categories: record.categories ?? [],
+    description: record.description ?? null,
     phone: record.phone ?? null,
     website: record.website ?? null,
     address: record.address ?? {},
@@ -137,8 +146,12 @@ function toNewLead(
     priceLevel: record.priceLevel ?? null,
     hours: record.hours ?? null,
     plusCode: record.plusCode ?? null,
-    emails: [],
-    socials: {},
+    ownerName: record.ownerName ?? null,
+    // Contact details a capture can legitimately carry (a social profile's
+    // mailto:/tel: links and its other profile URLs) — enrichment adds to these
+    // later, it is not their only source.
+    emails: record.emails ?? [],
+    socials: record.socials ?? {},
     techStack: [],
     pageSpeed: {},
     businessSize: "unknown",
@@ -254,11 +267,29 @@ async function rescueOneLead(
   await enforceAiQuota(session);
   const { data, result } = await rescueFromSnippet(lead.rawSnippet);
 
+  // Rescue FILLS GAPS — it never overwrites a value the capture already read
+  // off the page, which is more reliable than a model reading the same text.
+  // The one exception is the placeholder name the extension sends when a page
+  // gave it nothing to use.
   const patch: UpdateLead = { parseIssues: [], status: "new" };
-  if (data.businessName) patch.businessName = data.businessName;
-  if (data.phone) patch.phone = data.phone;
-  if (data.website) patch.website = data.website;
-  if (data.address) {
+  const nameIsPlaceholder =
+    !lead.businessName || lead.businessName === PLACEHOLDER_NAME;
+  if (data.businessName && nameIsPlaceholder) {
+    patch.businessName = data.businessName;
+  }
+  if (data.category && !lead.category) patch.category = data.category;
+  if (data.description && !lead.description) {
+    patch.description = data.description;
+  }
+  if (data.ownerName && !lead.ownerName) patch.ownerName = data.ownerName;
+  if (data.phone && !lead.phone) patch.phone = data.phone;
+  if (data.website && !lead.website) patch.website = data.website;
+  if (data.emails.length > 0) {
+    patch.emails = [
+      ...new Set([...lead.emails, ...data.emails.map((e) => e.toLowerCase())]),
+    ];
+  }
+  if (data.address && !lead.address?.raw) {
     patch.address =
       typeof data.address === "string"
         ? { ...lead.address, raw: data.address }
