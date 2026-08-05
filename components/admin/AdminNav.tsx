@@ -40,7 +40,6 @@ export function AdminNav({
       label: "Source packs",
       show: isSuperAdmin && scraperEnabled,
     },
-    { href: "/admin/filters", label: "Filters", show: isSuperAdmin },
     { href: "/admin/audit", label: "Audit log", show: isSuperAdmin },
     { href: "/admin/settings", label: "Settings", show: isSuperAdmin },
   ].filter((link) => link.show);

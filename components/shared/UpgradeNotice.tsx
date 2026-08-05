@@ -18,7 +18,7 @@ export interface UpgradeNoticeProps {
 
 /**
  * The one upsell surface for a plan-locked feature. Server-side guards
- * (`requireFeature` / `enforceProfileLimit`) are what actually enforce
+ * (`requireFeature` / `enforceLeadLimit`) are what actually enforce
  * entitlements — this is the graceful "not rendered" half of §2's rule that a
  * gated feature must never become a broken page or a thrown error.
  */

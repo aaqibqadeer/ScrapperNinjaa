@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 import { features } from "@/config/features";
+import { DEFAULT_AUTHED_PATH } from "@/lib/auth/constants";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -46,7 +47,7 @@ export function SignupForm() {
         setError(data.error ?? "Sign up failed");
         return;
       }
-      window.location.assign(data.redirect ?? "/dashboard");
+      window.location.assign(data.redirect ?? DEFAULT_AUTHED_PATH);
     } catch {
       setError("Something went wrong");
     } finally {

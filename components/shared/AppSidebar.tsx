@@ -8,10 +8,8 @@ import {
   ChevronRight,
   Copy,
   HelpCircle,
-  LayoutGrid,
   List,
   Megaphone,
-  MessageSquare,
   PanelLeft,
   Settings,
   Sparkles,
@@ -43,10 +41,6 @@ interface AppSidebarProps {
 
 /** Pick a lucide icon for a nav href (fallback: List). */
 function iconForHref(href: string) {
-  if (href === "/dashboard") return LayoutGrid;
-  if (href === "/profiles") return User;
-  if (href === "/settings/filters") return Settings;
-  if (href === "/settings/gmail") return MessageSquare;
   if (href === "/leads") return List;
   if (href === "/leads/campaigns") return Megaphone;
   if (href === "/leads/duplicates") return Copy;
@@ -62,7 +56,6 @@ function iconForHref(href: string) {
 
 /** Whether a nav link should render as active for the current pathname. */
 function isNavLinkActive(href: string, pathname: string): boolean {
-  if (href === "/dashboard") return pathname === "/dashboard";
   if (href === "/leads") return pathname === "/leads";
   return pathname === href || pathname.startsWith(`${href}/`);
 }

@@ -62,9 +62,8 @@ export function AccountSettings({
         <div>
           <p className="text-sm font-medium">Delete account</p>
           <p className="text-muted-foreground text-xs">
-            Starts a 30-day recoverable deletion. After that, your profiles
-            (including any EEO answers), applications, and Gmail connection
-            are permanently removed.
+            Starts a 30-day recoverable deletion. After that, your leads,
+            campaigns, and account data are permanently removed.
           </p>
         </div>
         <ConfirmDialog

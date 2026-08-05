@@ -62,10 +62,10 @@ export default async function InvitePage({ params }: InvitePageProps) {
         <CardContent>
           {problem ? (
             <a
-              href="/dashboard"
+              href="/leads"
               className="text-sm underline underline-offset-4"
             >
-              Go to dashboard
+              Go to Leads
             </a>
           ) : (
             <AcceptInviteButton token={token} />

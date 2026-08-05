@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 
+import { DEFAULT_AUTHED_PATH } from "@/lib/auth/constants";
 import { Button } from "@/components/ui/button";
 
-/** Accept the invitation identified by `token`, then land on the dashboard. */
+/** Accept the invitation identified by `token`, then land on the Lead Directory. */
 export function AcceptInviteButton({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,7 +24,7 @@ export function AcceptInviteButton({ token }: { token: string }) {
         setError(data.error ?? "Could not accept invitation");
         return;
       }
-      window.location.assign(data.redirect ?? "/dashboard");
+      window.location.assign(data.redirect ?? DEFAULT_AUTHED_PATH);
     } catch {
       setError("Something went wrong");
     } finally {

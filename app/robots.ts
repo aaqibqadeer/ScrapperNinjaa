@@ -13,9 +13,7 @@ import { env } from "@/config/env.schema";
 const DISALLOW = [
   "/api/",
   "/admin",
-  "/dashboard",
   "/leads",
-  "/profiles",
   "/settings",
   "/invite",
 ];

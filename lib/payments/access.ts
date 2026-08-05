@@ -90,19 +90,14 @@ export async function hasAccess(
 /**
  * Boolean entitlement keys stored in `plans.limits` (§15 — limits is an open
  * JSON blob, so adding one is a seed/admin edit, never a migration).
- * Numeric limits (aiCallsPerMonth, profileLimit) are NOT listed here: they are
+ * Numeric limits (aiCallsPerMonth, leadLimit, campaignLimit) are NOT listed here: they are
  * read with the typed helpers in `lib/usage/enforce.ts`, because `toBoolean`
  * would report any positive number as "allowed".
  */
 export const PLAN_FEATURES = {
-  // ScrapperNinja entitlements.
   enrichment: "enrichment",
   offerLines: "offerLines",
   dataExport: "dataExport",
-  // ApplyNinjaa entitlements — kept so the job-application code paths still
-  // typecheck/gate correctly when `jobApplications` is on in that fork.
-  customFilters: "customFilters",
-  gmailScan: "gmailScan",
 } as const;
 
 export type PlanFeature = (typeof PLAN_FEATURES)[keyof typeof PLAN_FEATURES];

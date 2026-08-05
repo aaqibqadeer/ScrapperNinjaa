@@ -56,8 +56,8 @@ export async function startCheckout(
   return payments.createCheckoutSession({
     priceId,
     customerId,
-    successUrl: `${base}/dashboard?checkout=success`,
-    cancelUrl: `${base}/dashboard?checkout=cancelled`,
+    successUrl: `${base}/leads?checkout=success`,
+    cancelUrl: `${base}/settings/billing?checkout=cancelled`,
     // ApplyNinjaa's trial is local and card-free (lib/payments/trials.ts) —
     // never forward a Stripe trial_end, or setting trialDays would silently
     // reintroduce card-based trials at checkout.
@@ -78,6 +78,6 @@ export async function openBillingPortal(
   const base = env.NEXT_PUBLIC_APP_URL;
   return payments.createBillingPortalSession({
     customerId: org.stripeCustomerId,
-    returnUrl: `${base}/dashboard`,
+    returnUrl: `${base}/settings/billing`,
   });
 }

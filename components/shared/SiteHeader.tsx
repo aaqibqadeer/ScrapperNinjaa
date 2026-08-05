@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/config/brand";
 
 interface SiteHeaderProps {
-  /** When true, swap the auth buttons for a single "Dashboard" link. */
+  /** When true, swap the auth buttons for a single "Leads" link. */
   signedIn?: boolean;
 }
 
@@ -18,7 +18,7 @@ const MARKETING_LINKS = [
 
 /**
  * Public marketing header for the landing page. Sticky, translucent, and
- * theme-aware. Shows Log in / Get started to visitors, or a Dashboard link once
+ * theme-aware. Shows Log in / Get started to visitors, or a Leads link once
  * a session exists (resolved by the page and passed as `signedIn`).
  */
 export function SiteHeader({ signedIn = false }: SiteHeaderProps) {
@@ -46,7 +46,7 @@ export function SiteHeader({ signedIn = false }: SiteHeaderProps) {
           <ThemeToggle />
           {signedIn ? (
             <Button asChild size="sm">
-              <Link href="/dashboard">Dashboard</Link>
+              <Link href="/leads">Leads</Link>
             </Button>
           ) : (
             <>

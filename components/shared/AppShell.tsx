@@ -15,23 +15,12 @@ interface AppShellProps {
 
 /**
  * Signed-in app chrome: collapsible left sidebar + scroll-contained main area.
- * Replaces the old top `AppHeader` bar for a denser leads-table layout.
  */
 export async function AppShell({ session, children }: AppShellProps) {
   const isOrgAdmin = session.role === ORG_ROLES.admin;
   const isSuperAdmin = session.user.isSuperAdmin;
 
   const links: AppNavLink[] = [
-    ...(features.jobApplications
-      ? [
-          { href: "/dashboard", label: "Dashboard" },
-          { href: "/profiles", label: "Profiles" },
-          { href: "/settings/filters", label: "Filters" },
-        ]
-      : []),
-    ...(features.gmail && features.jobApplications
-      ? [{ href: "/settings/gmail", label: "Gmail" }]
-      : []),
     ...(features.scraper.enabled
       ? [
           { href: "/leads", label: "Leads" },
@@ -67,16 +56,11 @@ export async function AppShell({ session, children }: AppShellProps) {
       .map((org) => ({ id: org.id, name: org.name }));
   }
 
-  const homeHref =
-    features.scraper.enabled && !features.jobApplications
-      ? "/leads"
-      : "/dashboard";
-
   return (
     <div className="flex h-screen overflow-hidden">
       <AppSidebar
         links={links}
-        homeHref={homeHref}
+        homeHref="/leads"
         workspaces={workspaces}
         activeOrgId={session.organizationId ?? ""}
         userEmail={session.user.email ?? ""}

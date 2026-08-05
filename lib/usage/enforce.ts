@@ -26,9 +26,6 @@ import {
 } from "./ai-usage";
 import { enforceRateLimit, requestIp } from "./rate-limit";
 
-const PROFILE_LIMIT_KEY = "profileLimit";
-const PROFILE_LIMIT_FALLBACK = 1;
-
 const LEAD_LIMIT_KEY = "leadLimit";
 const LEAD_LIMIT_FALLBACK = 100;
 const CAMPAIGN_LIMIT_KEY = "campaignLimit";
@@ -69,44 +66,6 @@ export function getAiCallCap(plan: EffectivePlan["plan"]): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? Math.floor(value)
     : 0;
-}
-
-/**
- * The plan's max profile count. An absent/malformed value falls back to 1, so
- * a misconfigured plan degrades to the Free allowance rather than locking
- * everyone out of profiles entirely.
- *
- * Deliberately NOT `hasAccess()` — that coerces any positive number to `true`.
- */
-export function getProfileLimit(plan: EffectivePlan["plan"]): number {
-  return readNumericLimit(plan, PROFILE_LIMIT_KEY, PROFILE_LIMIT_FALLBACK);
-}
-
-/**
- * Assert the user has room for one more profile. Limits gate CREATION only:
- * someone who downgrades keeps every existing profile readable and editable
- * (never delete user data on downgrade) — they simply can't add another.
- */
-export async function enforceProfileLimit(
-  session: Session,
-  currentCount: number,
-): Promise<void> {
-  if (!features.payments.enabled) return;
-  const { plan } = await getEffectivePlan(session);
-  const limit = getProfileLimit(plan);
-  if (currentCount < limit) return;
-  const upgrade = await lowestPlanWithLimitAbove(
-    PROFILE_LIMIT_KEY,
-    limit,
-    PROFILE_LIMIT_FALLBACK,
-  );
-  throw new EntitlementError(
-    PROFILE_LIMIT_KEY,
-    upgrade?.name ?? null,
-    limit === 1
-      ? "Your plan includes one profile — upgrade to create more"
-      : `Your plan includes ${limit} profiles — upgrade to create more`,
-  );
 }
 
 /**
