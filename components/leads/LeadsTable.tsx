@@ -112,6 +112,8 @@ import { cn } from "@/lib/utils";
 export interface LeadsTableProps {
   canExport?: boolean;
   exportPlan?: string | null;
+  /** Query string from the server request — seeds filters without reading `window`. */
+  initialSearch?: string;
 }
 
 /** A resolved table column (static catalog column or dynamic custom field). */
@@ -352,12 +354,6 @@ function hasUrlFilters(params: URLSearchParams): boolean {
   return false;
 }
 
-/** A snapshot of the current URL search params (client-only, once at mount). */
-function readInitialSearch(): URLSearchParams {
-  if (typeof window === "undefined") return new URLSearchParams();
-  return new URLSearchParams(window.location.search);
-}
-
 /** Reconstruct column-filter state from `f.<col>[.op]=…` URL params. */
 function readColumnFiltersFromSearch(
   params: URLSearchParams,
@@ -393,14 +389,16 @@ function readColumnFiltersFromSearch(
 export function LeadsTable({
   canExport = true,
   exportPlan,
+  initialSearch = "",
 }: LeadsTableProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
-  // Snapshot the URL once, at mount, to seed initial state (client-only). We
-  // then own the URL going forward via router.replace — never reading it back
-  // reactively — so writes can't loop with reads.
-  const initialSearchRef = useRef<URLSearchParams>(undefined);
-  if (!initialSearchRef.current) initialSearchRef.current = readInitialSearch();
+  // Snapshot the URL once at mount (from server-passed searchParams). We then
+  // own the URL via router.replace — never reading it back reactively.
+  const initialSearchRef = useRef<URLSearchParams | null>(null);
+  if (initialSearchRef.current === null) {
+    initialSearchRef.current = new URLSearchParams(initialSearch);
+  }
   const init = initialSearchRef.current;
   const truthyParam = (key: string): boolean => {
     const v = init.get(key);
@@ -1170,26 +1168,10 @@ export function LeadsTable({
   }
 
   async function saveView(name: string) {
-    const query: SavedViewQuery = {
-      campaignId: campaignId ?? null,
-      sessionId: sessionId ?? null,
-      ...(statusFilter ? { status: statusFilter } : {}),
-      ...(q ? { q } : {}),
-      ...(notEnriched ? { notEnriched: true } : {}),
-      ...(missingOfferLine ? { missingOfferLine: true } : {}),
-      ...(includeJunk ? { includeJunk: true } : {}),
-    };
     const res = await fetch("/api/views", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        columns: visibleColumns,
-        filters: filterSpecs,
-        query,
-        sort: { key: sortKey, dir: sortDir },
-        pageSize,
-      }),
+      body: JSON.stringify(buildViewPayload(name)),
     });
     const data = (await res.json().catch(() => ({}))) as {
       view?: SavedViewRecord;
@@ -1203,6 +1185,64 @@ export function LeadsTable({
     setViews((prev) => [...prev, data.view!]);
     setActiveViewId(data.view.id);
     toast.success(`Saved view "${data.view.name}"`);
+  }
+
+  async function updateView(id: string) {
+    const res = await fetch(`/api/views/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildViewPayload()),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      view?: SavedViewRecord;
+      error?: string;
+    };
+    if (!res.ok || !data.view) {
+      toast.error(data.error ?? "Could not update the view");
+      return;
+    }
+    invalidateFetchCache("/api/views");
+    setViews((prev) => prev.map((v) => (v.id === id ? data.view! : v)));
+    toast.success(`Updated view "${data.view.name}"`);
+  }
+
+  async function renameView(id: string, name: string) {
+    const res = await fetch(`/api/views/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      view?: SavedViewRecord;
+      error?: string;
+    };
+    if (!res.ok || !data.view) {
+      toast.error(data.error ?? "Could not rename the view");
+      return;
+    }
+    invalidateFetchCache("/api/views");
+    setViews((prev) => prev.map((v) => (v.id === id ? data.view! : v)));
+    toast.success(`Renamed view to "${data.view.name}"`);
+  }
+
+  function buildViewPayload(name?: string) {
+    const query: SavedViewQuery = {
+      campaignId: campaignId ?? null,
+      sessionId: sessionId ?? null,
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(q ? { q } : {}),
+      ...(notEnriched ? { notEnriched: true } : {}),
+      ...(missingOfferLine ? { missingOfferLine: true } : {}),
+      ...(includeJunk ? { includeJunk: true } : {}),
+    };
+    return {
+      ...(name ? { name } : {}),
+      columns: visibleColumns,
+      filters: filterSpecs,
+      query,
+      sort: { key: sortKey, dir: sortDir },
+      pageSize,
+    };
   }
 
   function loadView(id: string) {
@@ -1610,6 +1650,8 @@ export function LeadsTable({
             activeViewId={activeViewId}
             onLoad={loadView}
             onSave={(name) => void saveView(name)}
+            onUpdate={(id) => void updateView(id)}
+            onRename={(id, name) => void renameView(id, name)}
             onSetDefault={(id) => void setDefaultView(id)}
             onDelete={(id) => void deleteView(id)}
           />

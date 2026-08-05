@@ -72,6 +72,7 @@ function emitManifest(): Plugin {
 }
 
 export default defineConfig({
+  base: "./",
   root: PRODUCT_DIR,
   plugins: [react(), tailwindcss(), emitManifest()],
   define: {
@@ -80,6 +81,7 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, "dist", PRODUCT),
     emptyOutDir: true,
+    modulePreload: false,
     rollupOptions: {
       input: {
         popup: resolve(PRODUCT_DIR, "popup.html"),

@@ -79,14 +79,18 @@ export function App() {
         const data = await api<{ campaigns: Campaign[] }>("/api/campaigns");
         const active = data.campaigns.filter((c) => c.status !== "archived");
         setCampaigns(active);
-        setCampaignId((prev) => prev || active[0]?.id || "");
       } catch (err) {
         if (err instanceof SignInRequiredError) {
           setScreen("signed-out");
           return;
         }
       }
-      await refreshStatus();
+      const result = await sendCommand({ cmd: "GET_STATUS" });
+      setStatus(result.status);
+      // Only reflect an in-progress run — never auto-pick the first campaign.
+      if (result.status.running && result.status.campaignId) {
+        setCampaignId(result.status.campaignId);
+      }
       setScreen("ready");
     })();
   }, [refreshStatus]);

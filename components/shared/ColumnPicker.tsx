@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { GripVertical } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,24 @@ export function ColumnPicker({
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onChange(columns.map((c) => c.key))}
+        >
+          Select all
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onChange([])}
+        >
+          Select none
+        </Button>
+      </div>
       <div className="flex flex-col gap-1">
         <p className="text-muted-foreground text-xs font-medium">
           Visible columns
