@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { features } from "@/config/features";
 import { requireAuth } from "@/lib/auth/server";
 
@@ -15,11 +15,10 @@ export default async function OnboardingPage() {
   if (!features.jobApplications) notFound();
   const session = await requireAuth();
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
         <OnboardingWizard />
       </main>
-    </>
+    </AppShell>
   );
 }

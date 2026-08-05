@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { GmailScanPanel } from "@/components/gmail/GmailScanPanel";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { UpgradeNotice } from "@/components/shared/UpgradeNotice";
 import { features } from "@/config/features";
 import { requireAuth } from "@/lib/auth/server";
@@ -25,8 +25,7 @@ export default async function GmailSettingsPage() {
     : ((await lowestPlanWith(PLAN_FEATURES.gmailScan))?.name ?? null);
 
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
         <div className="mb-6">
           <h1 className="font-heading text-2xl font-semibold">Gmail scan</h1>
@@ -45,6 +44,6 @@ export default async function GmailSettingsPage() {
           />
         )}
       </main>
-    </>
+    </AppShell>
   );
 }

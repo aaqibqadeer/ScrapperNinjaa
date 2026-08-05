@@ -2,25 +2,38 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import type { Campaign } from "@/lib/db/schema";
 
 /**
- * Campaigns list with inline create, archive/reactivate, and delete. Feature
- * components stay feature-scoped (§9); the leads table's CampaignPicker owns the
- * "pick or quick-create" flow, while this owns full lifecycle management.
+ * Campaigns list with inline create, edit name/description, archive/reactivate,
+ * and delete. Feature components stay feature-scoped (§9).
  */
 export function CampaignsManager() {
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
 
   async function load() {
     const res = await fetch("/api/campaigns");
@@ -60,6 +73,46 @@ export function CampaignsManager() {
       toast.success(`Created "${data.campaign.name}"`);
     } finally {
       setBusy(false);
+    }
+  }
+
+  function openEdit(campaign: Campaign) {
+    setEditCampaign(campaign);
+    setEditName(campaign.name);
+    setEditDescription(campaign.description ?? "");
+  }
+
+  async function saveEdit() {
+    if (!editCampaign) return;
+    const trimmedName = editName.trim();
+    if (!trimmedName) return;
+    setEditBusy(true);
+    try {
+      const res = await fetch(`/api/campaigns/${editCampaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: trimmedName,
+          description: editDescription.trim() || null,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        campaign?: Campaign;
+        error?: string;
+      };
+      if (!res.ok || !data.campaign) {
+        toast.error(data.error ?? "Could not update the campaign");
+        return;
+      }
+      setCampaigns(
+        (prev) =>
+          prev?.map((c) => (c.id === editCampaign.id ? data.campaign! : c)) ??
+          null,
+      );
+      toast.success("Campaign updated");
+      setEditCampaign(null);
+    } finally {
+      setEditBusy(false);
     }
   }
 
@@ -152,6 +205,14 @@ export function CampaignsManager() {
                     View leads
                   </Link>
                 </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Edit ${campaign.name}`}
+                  onClick={() => openEdit(campaign)}
+                >
+                  <Pencil className="size-4" aria-hidden="true" />
+                </Button>
                 {campaign.status === "active" ? (
                   <Button
                     variant="outline"
@@ -190,6 +251,58 @@ export function CampaignsManager() {
           ))}
         </ul>
       )}
+
+      <Dialog
+        open={editCampaign !== null}
+        onOpenChange={(next) => {
+          if (editBusy) return;
+          if (!next) setEditCampaign(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit campaign</DialogTitle>
+            <DialogDescription>
+              Update the campaign name and an optional description.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-campaign-name">Name</Label>
+              <Input
+                id="edit-campaign-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-campaign-description">Description</Label>
+              <Textarea
+                id="edit-campaign-description"
+                value={editDescription}
+                placeholder="Optional notes about this campaign…"
+                rows={3}
+                onChange={(e) => setEditDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditCampaign(null)}
+              disabled={editBusy}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void saveEdit()}
+              disabled={editBusy || editName.trim().length === 0}
+            >
+              {editBusy ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

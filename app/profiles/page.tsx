@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ProfileList } from "@/components/profiles/ProfileList";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { UpgradeNotice } from "@/components/shared/UpgradeNotice";
 import { Button } from "@/components/ui/button";
@@ -35,8 +35,7 @@ export default async function ProfilesPage() {
     : null;
 
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -94,6 +93,6 @@ export default async function ProfilesPage() {
           </div>
         )}
       </main>
-    </>
+    </AppShell>
   );
 }

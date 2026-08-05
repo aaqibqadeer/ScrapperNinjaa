@@ -6,11 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Briefcase,
   Filter,
+  MoreHorizontal,
   Pencil,
   Plus,
   Sparkles,
   Upload,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,6 +21,7 @@ import {
 } from "@/components/jobs/RunAiPassDialog";
 import { CampaignPicker } from "@/components/leads/CampaignPicker";
 import { LeadDetailDrawer } from "@/components/leads/LeadDetailDrawer";
+import { SessionPicker } from "@/components/leads/SessionPicker";
 import { BulkActionBar } from "@/components/shared/BulkActionBar";
 import { DetailDrawer } from "@/components/shared/DetailDrawer";
 import {
@@ -55,7 +56,9 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -88,6 +91,7 @@ import {
   type LeadStatus,
   type SavedView as SavedViewRecord,
   type SavedViewPageSize,
+  type SavedViewQuery,
 } from "@/lib/db/schema";
 import { formatDateTime } from "@/lib/format/datetime";
 import { cn } from "@/lib/utils";
@@ -256,6 +260,21 @@ const OWNED_URL_KEYS = [
   "missingOfferLine",
 ];
 
+/** True when the URL already carries filters (skip applying the default view). */
+function hasUrlFilters(params: URLSearchParams): boolean {
+  if (params.get("campaignId")) return true;
+  if (params.get("sessionId")) return true;
+  if (params.get("q")) return true;
+  if (params.get("status")) return true;
+  if (params.get("includeJunk")) return true;
+  if (params.get("notEnriched")) return true;
+  if (params.get("missingOfferLine")) return true;
+  for (const key of params.keys()) {
+    if (key.startsWith("f.")) return true;
+  }
+  return false;
+}
+
 /** A snapshot of the current URL search params (client-only, once at mount). */
 function readInitialSearch(): URLSearchParams {
   if (typeof window === "undefined") return new URLSearchParams();
@@ -388,6 +407,7 @@ export function LeadsTable({
   const [detailOpen, setDetailOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
   /** Delay row→drawer so a double-click can win for inline edit. */
   const detailClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -634,7 +654,7 @@ export function LeadsTable({
         const data = (await viewsRes.json()) as { views: SavedViewRecord[] };
         setViews(data.views);
         const def = data.views.find((v) => v.isDefault);
-        if (def) applyView(def);
+        if (def && !hasUrlFilters(init)) applyView(def);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -685,6 +705,19 @@ export function LeadsTable({
     setSortKey(view.sort.key);
     setSortDir(view.sort.dir);
     setPageSize(view.pageSize);
+    const qv: SavedViewQuery = view.query ?? {};
+    setCampaignId(qv.campaignId ?? null);
+    setSessionId(qv.sessionId ?? null);
+    setStatusFilter(
+      (LEAD_STATUSES as readonly string[]).includes(qv.status ?? "")
+        ? (qv.status as LeadStatus)
+        : "",
+    );
+    setQInput(qv.q ?? "");
+    setQ(qv.q ?? "");
+    setNotEnriched(qv.notEnriched ?? false);
+    setMissingOfferLine(qv.missingOfferLine ?? false);
+    setIncludeJunk(qv.includeJunk ?? false);
     setPage(1);
     resetSelection();
     setActiveViewId(view.id);
@@ -1019,6 +1052,15 @@ export function LeadsTable({
   }
 
   async function saveView(name: string) {
+    const query: SavedViewQuery = {
+      campaignId: campaignId ?? null,
+      sessionId: sessionId ?? null,
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(q ? { q } : {}),
+      ...(notEnriched ? { notEnriched: true } : {}),
+      ...(missingOfferLine ? { missingOfferLine: true } : {}),
+      ...(includeJunk ? { includeJunk: true } : {}),
+    };
     const res = await fetch("/api/views", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1026,6 +1068,7 @@ export function LeadsTable({
         name,
         columns: visibleColumns,
         filters: filterSpecs,
+        query,
         sort: { key: sortKey, dir: sortDir },
         pageSize,
       }),
@@ -1236,9 +1279,9 @@ export function LeadsTable({
   const dirtyCount = Object.keys(dirty).length;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Input
           value={qInput}
           onChange={(e) => setQInput(e.target.value)}
@@ -1248,10 +1291,24 @@ export function LeadsTable({
         />
         <CampaignPicker
           value={campaignId}
-          onChange={(id) => withReset(() => setCampaignId(id))}
+          onChange={(id) => {
+            withReset(() => setCampaignId(id));
+            setActiveViewId(null);
+          }}
           campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))}
           onCreated={(campaign) => setCampaigns((prev) => [campaign, ...prev])}
           placeholder="All campaigns"
+          showCreateButton={false}
+          createOpen={createCampaignOpen}
+          onCreateOpenChange={setCreateCampaignOpen}
+        />
+        <SessionPicker
+          value={sessionId}
+          onChange={(id) => {
+            withReset(() => setSessionId(id));
+            setActiveViewId(null);
+          }}
+          placeholder="All sessions"
         />
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -1291,7 +1348,9 @@ export function LeadsTable({
               disabled={rescuing}
             >
               <Sparkles aria-hidden="true" />
-              {rescuing ? "Rescuing…" : `Rescue ${needsReviewCount} record${needsReviewCount === 1 ? "" : "s"}`}
+              {rescuing
+                ? "Rescuing…"
+                : `Rescue ${needsReviewCount} record${needsReviewCount === 1 ? "" : "s"}`}
             </Button>
           )}
 
@@ -1316,29 +1375,42 @@ export function LeadsTable({
             {editMode ? "Editing…" : "Edit mode"}
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setImportOpen(true)}
-          >
-            <Upload aria-hidden="true" />
-            Import
-          </Button>
-
-          {canExport ? (
-            <Button variant="outline" size="sm" onClick={exportCsv}>
-              Export CSV
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-              title={`CSV export is available on ${exportPlan ?? "a paid plan"} and above`}
-            >
-              <Link href="/settings/billing">Export CSV</Link>
-            </Button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <MoreHorizontal aria-hidden="true" />
+                More
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => setCreateCampaignOpen(true)}>
+                New campaign
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                <Upload aria-hidden="true" />
+                Import CSV
+              </DropdownMenuItem>
+              {canExport ? (
+                <DropdownMenuItem onSelect={exportCsv}>
+                  Export CSV
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem asChild>
+                  <Link
+                    href="/settings/billing"
+                    title={`CSV export is available on ${exportPlan ?? "a paid plan"} and above`}
+                  >
+                    Export CSV (upgrade)
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/leads/settings">Custom fields</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus aria-hidden="true" />
@@ -1347,28 +1419,8 @@ export function LeadsTable({
         </div>
       </div>
 
-      {/* Capture-session filter banner */}
-      {sessionId && (
-        <div className="bg-accent text-accent-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-          <Filter className="size-4" aria-hidden="true" />
-          <span>Filtered by capture session</span>
-          <code className="bg-muted rounded px-1.5 py-0.5 text-xs">
-            {sessionId}
-          </code>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto h-7"
-            onClick={() => withReset(() => setSessionId(null))}
-          >
-            <X aria-hidden="true" />
-            Clear
-          </Button>
-        </div>
-      )}
-
       {/* Status filter chips */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => withReset(() => setStatusFilter(""))}
@@ -1461,7 +1513,7 @@ export function LeadsTable({
         <div
           role="toolbar"
           aria-label="Edit mode"
-          className="bg-primary/10 border-primary/30 flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-sm"
+          className="bg-primary/10 border-primary/30 flex shrink-0 flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-sm"
         >
           <span className="font-medium">
             Edit mode — this page
@@ -1501,7 +1553,8 @@ export function LeadsTable({
       )}
 
       {/* Bulk actions */}
-      <BulkActionBar
+      <div className="shrink-0">
+        <BulkActionBar
         selectedCount={selectedCount}
         totalMatching={total}
         onClear={resetSelection}
@@ -1579,24 +1632,26 @@ export function LeadsTable({
           }
         />
       </BulkActionBar>
+      </div>
 
-      {/* Table */}
-      {leads === null ? (
-        <p className="text-muted-foreground text-sm">Loading leads…</p>
-      ) : leads.length === 0 ? (
-        <EmptyState
-          title="No leads yet"
-          description="Capture businesses with the extension, import a CSV, or add one manually to get started."
-          action={
-            <Button size="sm" onClick={() => setAddOpen(true)}>
-              <Plus aria-hidden="true" />
-              Add lead
-            </Button>
-          }
-        />
-      ) : (
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
+      {/* Table — scroll contained here */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {leads === null ? (
+          <p className="text-muted-foreground text-sm">Loading leads…</p>
+        ) : leads.length === 0 ? (
+          <EmptyState
+            title="No leads yet"
+            description="Capture businesses with the extension, import a CSV, or add one manually to get started."
+            action={
+              <Button size="sm" onClick={() => setAddOpen(true)}>
+                <Plus aria-hidden="true" />
+                Add lead
+              </Button>
+            }
+          />
+        ) : (
+          <div className="min-h-0 flex-1 overflow-auto rounded-md border">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8">
@@ -1718,10 +1773,12 @@ export function LeadsTable({
             </TableBody>
           </Table>
         </div>
-      )}
+        )}
+      </div>
 
       {leads !== null && leads.length > 0 && (
-        <Pagination
+        <div className="shrink-0">
+          <Pagination
           page={page}
           pageSize={pageSize}
           total={total}
@@ -1734,10 +1791,11 @@ export function LeadsTable({
             withReset(() => setPageSize(size as SavedViewPageSize))
           }
         />
+        </div>
       )}
 
       {loading && leads !== null && (
-        <p className="text-muted-foreground text-xs">Refreshing…</p>
+        <p className="text-muted-foreground shrink-0 text-xs">Refreshing…</p>
       )}
 
       <LeadDetailDrawer

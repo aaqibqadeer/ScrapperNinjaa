@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { AccountSettings } from "@/components/account/AccountSettings";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { requireAuth } from "@/lib/auth/server";
 import { db } from "@/lib/db";
 
@@ -14,8 +14,7 @@ export default async function AccountSettingsPage() {
   const user = await db.getUserById(session.user.id);
 
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
         <div className="mb-6">
           <h1 className="font-heading text-2xl font-semibold">Account</h1>
@@ -28,6 +27,6 @@ export default async function AccountSettingsPage() {
           marketingEmailsEnabled={user?.marketingEmailsEnabled ?? true}
         />
       </main>
-    </>
+    </AppShell>
   );
 }

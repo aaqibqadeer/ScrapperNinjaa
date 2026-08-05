@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 
 import { AdminNav } from "@/components/admin/AdminNav";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { features } from "@/config/features";
 import { requireAuth } from "@/lib/auth/server";
 
@@ -30,8 +30,7 @@ export default async function AdminLayout({
   if (!isSuperAdmin && !isSupportAdmin) notFound();
 
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-6">
         <div>
           <h1 className="text-2xl font-semibold">Admin</h1>
@@ -49,6 +48,6 @@ export default async function AdminLayout({
         />
         <div>{children}</div>
       </div>
-    </>
+    </AppShell>
   );
 }

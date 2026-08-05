@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { ManageBillingButton } from "@/components/billing/ManageBillingButton";
 import { PlanPicker, type PlanCardData } from "@/components/billing/PlanPicker";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import {
   Card,
   CardContent,
@@ -56,8 +56,7 @@ export default async function BillingPage() {
   }));
 
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
         <div className="mb-6">
           <h1 className="font-heading text-2xl font-semibold">Billing</h1>
@@ -121,6 +120,6 @@ export default async function BillingPage() {
           annualBilling={features.payments.annualBilling}
         />
       </main>
-    </>
+    </AppShell>
   );
 }

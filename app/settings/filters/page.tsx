@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { FilterToggles } from "@/components/filters/FilterToggles";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { features } from "@/config/features";
 import { requireAuth } from "@/lib/auth/server";
 import {
@@ -23,8 +23,7 @@ export default async function FilterSettingsPage() {
     ? null
     : ((await lowestPlanWith(PLAN_FEATURES.customFilters))?.name ?? null);
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
         <div className="mb-6">
           <h1 className="font-heading text-2xl font-semibold">
@@ -41,6 +40,6 @@ export default async function FilterSettingsPage() {
           requiredPlan={requiredPlan}
         />
       </main>
-    </>
+    </AppShell>
   );
 }

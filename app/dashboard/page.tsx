@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { VerifyEmailBanner } from "@/components/auth/VerifyEmailBanner";
 import { ApplicationsTable } from "@/components/dashboard/ApplicationsTable";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { features } from "@/config/features";
 import { requireAuth } from "@/lib/auth/server";
@@ -36,8 +36,7 @@ export default async function DashboardPage() {
     : ((await lowestPlanWith(PLAN_FEATURES.dataExport))?.name ?? null);
 
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
         {!session.user.emailVerified && <VerifyEmailBanner />}
 
@@ -65,6 +64,6 @@ export default async function DashboardPage() {
 
         <ApplicationsTable canExport={canExport} exportPlan={exportPlan} />
       </main>
-    </>
+    </AppShell>
   );
 }

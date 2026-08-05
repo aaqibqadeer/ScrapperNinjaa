@@ -415,6 +415,7 @@ interface SavedViewDoc {
   name: string;
   columns: string[];
   filters: Record<string, unknown>;
+  query?: Record<string, unknown>;
   sort: SavedViewSort;
   page_size: number;
   is_default: boolean;
@@ -1012,6 +1013,7 @@ const savedViewSchemaMongo = new Schema<SavedViewDoc>(
     name: { type: String, required: true },
     columns: { type: [String], default: [] },
     filters: { type: Schema.Types.Mixed, default: {} },
+    query: { type: Schema.Types.Mixed, default: {} },
     sort: { type: Schema.Types.Mixed, default: { key: "createdAt", dir: "desc" } },
     page_size: { type: Number, required: true, default: 25 },
     is_default: { type: Boolean, required: true, default: false },
@@ -1556,6 +1558,7 @@ function toSavedView(doc: SavedViewDoc): SavedView {
     name: doc.name,
     columns: doc.columns ?? [],
     filters: doc.filters ?? {},
+    query: (doc.query ?? {}) as SavedView["query"],
     sort: doc.sort ?? { key: "createdAt", dir: "desc" },
     pageSize: (doc.page_size ?? 25) as SavedView["pageSize"],
     isDefault: doc.is_default ?? false,
@@ -3071,6 +3074,7 @@ export class MongoAdapter implements DatabaseAdapter {
       name: parsed.name,
       columns: parsed.columns,
       filters: parsed.filters,
+      query: parsed.query ?? {},
       sort: parsed.sort,
       page_size: parsed.pageSize,
       is_default: parsed.isDefault,
@@ -3100,6 +3104,7 @@ export class MongoAdapter implements DatabaseAdapter {
     if (patch.name !== undefined) update.name = patch.name;
     if (patch.columns !== undefined) update.columns = patch.columns;
     if (patch.filters !== undefined) update.filters = patch.filters;
+    if (patch.query !== undefined) update.query = patch.query;
     if (patch.sort !== undefined) update.sort = patch.sort;
     if (patch.pageSize !== undefined) update.page_size = patch.pageSize;
     if (patch.isDefault !== undefined) update.is_default = patch.isDefault;

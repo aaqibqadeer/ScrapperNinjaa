@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { ProfileEditor } from "@/components/profiles/ProfileEditor";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { features } from "@/config/features";
 import { requireAuth } from "@/lib/auth/server";
 import { db } from "@/lib/db";
@@ -27,14 +27,13 @@ export default async function NewProfilePage() {
   if (profiles.length >= getProfileLimit(plan)) redirect("/profiles");
 
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
         <h1 className="font-heading mb-6 text-2xl font-semibold">
           New profile
         </h1>
         <ProfileEditor initial={{ ...emptyProfileValues, name: "" }} />
       </main>
-    </>
+    </AppShell>
   );
 }

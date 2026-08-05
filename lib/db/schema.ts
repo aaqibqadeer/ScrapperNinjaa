@@ -1090,6 +1090,18 @@ export const savedViewPageSizeSchema = z.union([
 ]);
 export type SavedViewPageSize = z.infer<typeof savedViewPageSizeSchema>;
 
+/** Global leads-table filters persisted alongside column filters in a view. */
+export const savedViewQuerySchema = z.object({
+  campaignId: z.string().nullable().optional(),
+  sessionId: z.string().nullable().optional(),
+  status: z.string().optional(),
+  q: z.string().optional(),
+  notEnriched: z.boolean().optional(),
+  missingOfferLine: z.boolean().optional(),
+  includeJunk: z.boolean().optional(),
+});
+export type SavedViewQuery = z.infer<typeof savedViewQuerySchema>;
+
 export const savedViewSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
@@ -1097,6 +1109,7 @@ export const savedViewSchema = z.object({
   name: z.string().min(1),
   columns: z.array(z.string()).default([]),
   filters: z.record(z.string(), z.unknown()).default({}),
+  query: savedViewQuerySchema.default({}),
   sort: savedViewSortSchema.default({ key: "createdAt", dir: "desc" }),
   pageSize: savedViewPageSizeSchema.default(25),
   isDefault: z.boolean().default(false),

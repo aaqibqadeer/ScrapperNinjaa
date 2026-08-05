@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { DuplicateReview } from "@/components/leads/DuplicateReview";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { features } from "@/config/features";
 import { requireAuth } from "@/lib/auth/server";
@@ -16,21 +16,19 @@ export default async function DuplicatesPage() {
 
   if (!features.scraper.enabled) {
     return (
-      <>
-        <AppHeader session={session} />
+    <AppShell session={session}>
         <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
           <EmptyState
             title="Duplicate review is not enabled"
             description="The lead-scraping product is turned off for this workspace."
           />
         </main>
-      </>
-    );
+      </AppShell>
+  );
   }
 
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -52,6 +50,6 @@ export default async function DuplicatesPage() {
 
         <DuplicateReview />
       </main>
-    </>
+    </AppShell>
   );
 }

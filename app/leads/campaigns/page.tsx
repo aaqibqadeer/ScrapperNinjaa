@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { CampaignsManager } from "@/components/leads/CampaignsManager";
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { features } from "@/config/features";
 import { requireAuth } from "@/lib/auth/server";
@@ -15,22 +15,20 @@ export default async function CampaignsPage() {
 
   if (!features.scraper.enabled) {
     return (
-      <>
-        <AppHeader session={session} />
-        <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+      <AppShell session={session}>
+        <main className="mx-auto w-full max-w-3xl flex-1 overflow-auto px-6 py-10">
           <EmptyState
             title="Campaigns are not enabled"
             description="The lead-scraping product is turned off for this workspace."
           />
         </main>
-      </>
-    );
+      </AppShell>
+  );
   }
 
   return (
-    <>
-      <AppHeader session={session} />
-      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
+    <AppShell session={session}>
+      <main className="mx-auto w-full max-w-4xl flex-1 overflow-auto px-6 py-10">
         <div className="mb-6">
           <h1 className="font-heading text-2xl font-semibold">Campaigns</h1>
           <p className="text-muted-foreground text-sm">
@@ -39,6 +37,6 @@ export default async function CampaignsPage() {
         </div>
         <CampaignsManager />
       </main>
-    </>
+    </AppShell>
   );
 }

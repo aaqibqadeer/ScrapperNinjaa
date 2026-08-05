@@ -18,7 +18,7 @@ interface AppNavProps {
 /**
  * Horizontal in-app nav with active-route highlighting. Client-only so it can
  * read `usePathname`; the link set is computed on the server (from flags + the
- * viewer's role) and passed in as plain data — see `AppHeader`.
+ * viewer's role) and passed in as plain data — see `AppShell`.
  */
 export function AppNav({ links, className }: AppNavProps) {
   const pathname = usePathname();
@@ -29,7 +29,10 @@ export function AppNav({ links, className }: AppNavProps) {
         const active =
           link.href === "/dashboard"
             ? pathname === "/dashboard"
-            : pathname.startsWith(link.href);
+            : link.href === "/leads"
+              ? pathname === "/leads"
+              : pathname === link.href ||
+                pathname.startsWith(`${link.href}/`);
         return (
           <Link
             key={link.href}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { AppHeader } from "@/components/shared/AppHeader";
+import { AppShell } from "@/components/shared/AppShell";
 import { features } from "@/config/features";
 import { requireAuth } from "@/lib/auth/server";
 import { listFiltersForUser } from "@/lib/filters/service";
@@ -56,8 +56,7 @@ export default async function HelpPage() {
   const profileLimit = getProfileLimit(plan);
 
   return (
-    <>
-      <AppHeader session={session} />
+    <AppShell session={session}>
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
         <h1 className="font-heading text-2xl font-semibold">How it works</h1>
         <p className="text-muted-foreground mt-1 text-sm">
@@ -224,6 +223,6 @@ export default async function HelpPage() {
           </p>
         </section>
       </main>
-    </>
+    </AppShell>
   );
 }

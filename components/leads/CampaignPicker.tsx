@@ -32,6 +32,11 @@ export interface CampaignPickerProps {
   onCreated: (campaign: Campaign) => void;
   /** Placeholder label for the empty selection. */
   placeholder?: string;
+  /** When false, hides the inline "New" button (e.g. creation lives in a menu). */
+  showCreateButton?: boolean;
+  /** Controlled create-dialog open state (for external triggers like a More menu). */
+  createOpen?: boolean;
+  onCreateOpenChange?: (open: boolean) => void;
   className?: string;
 }
 
@@ -46,9 +51,14 @@ export function CampaignPicker({
   campaigns,
   onCreated,
   placeholder = "No campaign",
+  showCreateButton = true,
+  createOpen: createOpenProp,
+  onCreateOpenChange,
   className,
 }: CampaignPickerProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = createOpenProp ?? internalOpen;
+  const setOpen = onCreateOpenChange ?? setInternalOpen;
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -95,14 +105,16 @@ export function CampaignPicker({
           </option>
         ))}
       </Select>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(true)}
-      >
-        New
-      </Button>
+      {showCreateButton && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setOpen(true)}
+        >
+          New
+        </Button>
+      )}
 
       <Dialog
         open={open}
