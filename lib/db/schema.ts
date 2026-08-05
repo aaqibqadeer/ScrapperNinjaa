@@ -714,6 +714,7 @@ export const ADMIN_ACTIONS = [
   "ban_user",
   "delete_user",
   "cancel_subscription",
+  "assign_plan",
   "plan_create",
   "plan_update",
   "plan_delete",
@@ -941,6 +942,9 @@ export const leadSchema = z.object({
   capturedByUserId: z.string().nullable().optional(),
   /** Client-generated idempotency key for capture (unique per org, sparse). */
   clientCaptureId: z.string().nullable().optional(),
+  /** The `capture_sessions` run this lead was first captured in, when known.
+   * Powers the /leads?sessionId=… drill-down from the sessions table. */
+  captureSessionId: z.string().nullable().optional(),
   /* -- captured ------------------------------------------------------------ */
   businessName: z.string().min(1),
   category: z.string().nullable().optional(),
@@ -1199,10 +1203,12 @@ export const CAPTURE_MODES = ["fast", "deep"] as const;
 export const captureModeSchema = z.enum(CAPTURE_MODES);
 export type CaptureMode = z.infer<typeof captureModeSchema>;
 
-/** Lifecycle of a capture run. */
+/** Lifecycle of a capture run. `stopped` = the user ended it midway (a normal,
+ * non-error stop); `canceled` is reserved for a true abort. */
 export const CAPTURE_SESSION_STATUSES = [
   "running",
   "completed",
+  "stopped",
   "failed",
   "canceled",
 ] as const;

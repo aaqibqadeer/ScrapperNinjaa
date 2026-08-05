@@ -33,6 +33,7 @@ import { PLAN_FEATURES, requireFeature } from "@/lib/payments/access";
 import { enforceCampaignLimit, enforceLeadLimit } from "@/lib/usage/enforce";
 
 import {
+  CUSTOM_FIELD_PREFIX,
   customFieldSlug,
   DEFAULT_VISIBLE_COLUMNS,
   getColumn,
@@ -137,11 +138,30 @@ export const bulkActionSchema = z
 export type BulkActionInput = z.infer<typeof bulkActionSchema>;
 
 export const leadImportSchema = z.object({
-  /** CSV header → lead column key. */
+  /**
+   * CSV header → target. A target is a standard lead column key, an existing
+   * custom field (`customFields.<slug>`), or `__new__` to auto-create a text
+   * custom field from the header.
+   */
   mapping: z.record(z.string(), z.string()),
   rows: z.array(z.record(z.string(), z.string())).max(5000),
+  /** Auto-create missing text custom fields for `__new__`/unknown targets. */
+  autoCreateFields: z.boolean().optional(),
 });
 export type LeadImportInput = z.infer<typeof leadImportSchema>;
+
+/** Sentinel mapping target meaning "make a new text custom field". */
+const NEW_CUSTOM_FIELD_MARKER = "__new__";
+
+/** Derive a valid custom-field key (`[a-z0-9_]`) from a CSV header. */
+function slugifyCustomFieldKey(header: string): string {
+  return header
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60);
+}
 
 export const campaignInputSchema = z.object({
   name: z.string().min(1).max(200),
@@ -524,18 +544,83 @@ export async function importLeadsCsv(
   assertScraperEnabled();
   const orgId = requireOrg(session);
 
-  // Apply the column mapping (CSV header → lead column key) to each row.
+  // Resolve custom-field targets in the mapping and ensure each one exists,
+  // creating missing text fields when the header asked for a new field (or an
+  // unknown custom target and `autoCreateFields` is set).
+  const existingFields = await db.listLeadCustomFields(orgId);
+  const fieldByKey = new Map(existingFields.map((f) => [f.key, f]));
+  const resolvedMapping: Record<string, string> = {};
+  const fieldsToCreate = new Map<string, string>();
+
+  for (const [header, target] of Object.entries(input.mapping)) {
+    if (!target) continue;
+    if (target === NEW_CUSTOM_FIELD_MARKER) {
+      const slug = slugifyCustomFieldKey(header);
+      if (!slug) continue;
+      resolvedMapping[header] = `${CUSTOM_FIELD_PREFIX}${slug}`;
+      if (!fieldByKey.has(slug) && !fieldsToCreate.has(slug)) {
+        fieldsToCreate.set(slug, header.trim() || slug);
+      }
+    } else if (isCustomFieldColumnKey(target)) {
+      const slug = customFieldSlug(target);
+      if (!slug) continue;
+      if (fieldByKey.has(slug)) {
+        resolvedMapping[header] = target;
+      } else if (input.autoCreateFields) {
+        resolvedMapping[header] = target;
+        if (!fieldsToCreate.has(slug)) {
+          fieldsToCreate.set(slug, header.trim() || slug);
+        }
+      }
+      // Unknown custom target without auto-create: silently dropped.
+    } else {
+      resolvedMapping[header] = target; // standard column key
+    }
+  }
+
+  let nextSortOrder = existingFields.length;
+  for (const [key, label] of fieldsToCreate) {
+    if (fieldByKey.has(key)) continue;
+    const created = await db.createLeadCustomField({
+      organizationId: orgId,
+      key,
+      label,
+      type: "text",
+      options: [],
+      sortOrder: nextSortOrder++,
+    });
+    fieldByKey.set(key, created);
+  }
+
+  // Apply the resolved mapping to each row, splitting standard columns from
+  // custom-field values.
   const mappedRows = input.rows.map((row) => {
     const mapped: Record<string, string> = {};
-    for (const [csvHeaderName, columnKey] of Object.entries(input.mapping)) {
-      const value = row[csvHeaderName];
-      if (value !== undefined) mapped[columnKey] = value;
+    const custom: Record<string, string> = {};
+    for (const [header, columnKey] of Object.entries(resolvedMapping)) {
+      const value = row[header];
+      if (value === undefined) continue;
+      if (isCustomFieldColumnKey(columnKey)) {
+        const slug = customFieldSlug(columnKey);
+        if (slug && fieldByKey.has(slug)) custom[slug] = value;
+      } else {
+        mapped[columnKey] = value;
+      }
     }
-    return mapped;
+    return { mapped, custom };
   });
 
   const candidates = mappedRows
-    .map(mappedRowToCreateInput)
+    .map(({ mapped, custom }): LeadCreateInput | null => {
+      const base = mappedRowToCreateInput(mapped);
+      if (!base) return null;
+      const trimmed: Record<string, string> = {};
+      for (const [key, value] of Object.entries(custom)) {
+        if (value.trim().length > 0) trimmed[key] = value.trim();
+      }
+      if (Object.keys(trimmed).length > 0) base.customFields = trimmed;
+      return base;
+    })
     .filter((c): c is LeadCreateInput => c !== null);
   const skipped = input.rows.length - candidates.length;
 

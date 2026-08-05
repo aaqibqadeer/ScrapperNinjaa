@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { RowNumberCell } from "@/components/shared/RowNumberCell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -66,6 +67,12 @@ export function PlanManager({
   }
 
   const columns: DataTableColumn<Plan>[] = [
+    {
+      key: "num",
+      header: "#",
+      className: "w-10 text-right",
+      cell: (_p, index) => <RowNumberCell index={index} />,
+    },
     {
       key: "name",
       header: "Name",

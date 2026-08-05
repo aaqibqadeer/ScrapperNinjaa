@@ -111,6 +111,7 @@ function toNewLead(
   session: Session,
   sourceType: IngestBatchInput["sourceType"],
   campaignIds: string[],
+  captureSessionId: string | null,
   record: IngestRecordInput,
 ): NewLead {
   const flagged = (record.parseIssues?.length ?? 0) > 0;
@@ -122,6 +123,7 @@ function toNewLead(
     capturedAt: new Date(),
     capturedByUserId: session.user.id,
     clientCaptureId: record.clientCaptureId,
+    captureSessionId,
     businessName: record.businessName,
     category: record.category ?? null,
     categories: record.categories ?? [],
@@ -170,6 +172,7 @@ export async function ingestLeads(
     if (!campaign) throw new ScraperError("Campaign not found", 404);
   }
   const campaignIds = campaignId ? [campaignId] : [];
+  const sessionId = input.sessionId ?? null;
 
   let created = 0;
   let updated = 0;
@@ -180,13 +183,21 @@ export async function ingestLeads(
       await db.upsertLeadByClientCaptureId(
         orgId,
         record.clientCaptureId,
-        toNewLead(orgId, session, input.sourceType, campaignIds, record),
+        toNewLead(
+          orgId,
+          session,
+          input.sourceType,
+          campaignIds,
+          sessionId,
+          record,
+        ),
       );
     if (wasCreated) created += 1;
     else updated += 1;
 
     // Provenance: one row per captured record (a merged lead can later show it
     // came from multiple sources — that's why this is a separate collection).
+    // The session id is also stashed on the raw payload as a backup pointer.
     await db.createLeadSource({
       organizationId: orgId,
       leadId: lead.id,
@@ -194,7 +205,9 @@ export async function ingestLeads(
       sourceUrl: record.sourceUrl ?? null,
       campaignId,
       capturedAt: lead.capturedAt,
-      rawPayload: record.rawPayload ?? {},
+      rawPayload: sessionId
+        ? { ...(record.rawPayload ?? {}), sessionId }
+        : (record.rawPayload ?? {}),
     });
 
     if (lead.status === "needs_review" && lead.rawSnippet) {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -29,22 +30,34 @@ export const LEAD_IMPORT_FIELDS = [
 
 export type LeadImportField = (typeof LEAD_IMPORT_FIELDS)[number];
 
+/** Sentinel mapping value: create a new text custom field from the header. */
+export const NEW_CUSTOM_FIELD_VALUE = "__new__";
+/** Prefix marking a mapping target that is an existing custom field. */
+const CUSTOM_FIELD_MAP_PREFIX = "customFields.";
+
 export interface CsvImportResult {
   imported: number;
   errors: number;
 }
 
 export interface CsvImportPayload {
-  /** CSV header → lead field. Only mapped columns are included. */
+  /**
+   * CSV header → target. A target is a standard lead field, an existing custom
+   * field (`customFields.<key>`), or `__new__` to auto-create a text field.
+   */
   mapping: Record<string, string>;
   /** Parsed rows, keyed by CSV header. */
   rows: Record<string, string>[];
+  /** When true, unmapped headers become new text custom fields on import. */
+  autoCreateFields?: boolean;
 }
 
 export interface CsvImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImport: (payload: CsvImportPayload) => Promise<CsvImportResult>;
+  /** The org's existing custom fields, offered as extra mapping targets. */
+  customFields?: { key: string; label: string }[];
 }
 
 interface ParsedCsv {
@@ -139,12 +152,14 @@ export function CsvImportDialog({
   open,
   onOpenChange,
   onImport,
+  customFields = [],
 }: CsvImportDialogProps) {
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [autoCreate, setAutoCreate] = useState(false);
   const [result, setResult] = useState<CsvImportResult | null>(null);
 
   function reset() {
@@ -153,6 +168,7 @@ export function CsvImportDialog({
     setFileName("");
     setError(null);
     setBusy(false);
+    setAutoCreate(false);
     setResult(null);
   }
 
@@ -183,9 +199,17 @@ export function CsvImportDialog({
 
   async function handleImport() {
     if (!parsed) return;
-    const activeMapping = Object.fromEntries(
-      Object.entries(mapping).filter(([, field]) => field),
-    );
+    const activeMapping: Record<string, string> = {};
+    for (const [header, field] of Object.entries(mapping)) {
+      if (field) activeMapping[header] = field;
+    }
+    // With auto-create on, any header the user didn't map becomes a new text
+    // custom field so no CSV column is silently dropped.
+    if (autoCreate) {
+      for (const header of parsed.headers) {
+        if (!activeMapping[header]) activeMapping[header] = NEW_CUSTOM_FIELD_VALUE;
+      }
+    }
     if (Object.keys(activeMapping).length === 0) {
       setError("Map at least one column to a lead field.");
       return;
@@ -196,6 +220,7 @@ export function CsvImportDialog({
       const res = await onImport({
         mapping: activeMapping,
         rows: parsed.rows,
+        autoCreateFields: autoCreate,
       });
       setResult(res);
     } catch (e) {
@@ -302,11 +327,28 @@ export function CsvImportDialog({
                               }
                             >
                               <option value="">— Skip —</option>
-                              {LEAD_IMPORT_FIELDS.map((field) => (
-                                <option key={field} value={field}>
-                                  {field}
-                                </option>
-                              ))}
+                              <optgroup label="Standard fields">
+                                {LEAD_IMPORT_FIELDS.map((field) => (
+                                  <option key={field} value={field}>
+                                    {field}
+                                  </option>
+                                ))}
+                              </optgroup>
+                              {customFields.length > 0 && (
+                                <optgroup label="Custom fields">
+                                  {customFields.map((field) => (
+                                    <option
+                                      key={field.key}
+                                      value={`${CUSTOM_FIELD_MAP_PREFIX}${field.key}`}
+                                    >
+                                      {field.label}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              <option value={NEW_CUSTOM_FIELD_VALUE}>
+                                + New custom field…
+                              </option>
                             </Select>
                           </td>
                         </tr>
@@ -314,6 +356,14 @@ export function CsvImportDialog({
                     </tbody>
                   </table>
                 </div>
+
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={autoCreate}
+                    onChange={(e) => setAutoCreate(e.target.checked)}
+                  />
+                  Create custom fields for unmapped columns
+                </label>
               </div>
             )}
           </div>

@@ -65,6 +65,9 @@ interface WorkerState {
   needsReview: number;
   reachedCap: boolean;
   reachedEnd: boolean;
+  /** Set when the user pressed Stop — distinguishes a normal mid-run stop from
+   * a true abort/error when finishing the session. */
+  stoppedByUser: boolean;
   lastError: string | null;
 }
 
@@ -86,6 +89,7 @@ function defaultState(): WorkerState {
     needsReview: 0,
     reachedCap: false,
     reachedEnd: false,
+    stoppedByUser: false,
     lastError: null,
   };
 }
@@ -214,7 +218,9 @@ async function createSession(sourceUrl: string): Promise<string | null> {
   }
 }
 
-async function finishSession(status: "completed" | "canceled"): Promise<void> {
+async function finishSession(
+  status: "completed" | "stopped" | "canceled",
+): Promise<void> {
   if (!state.sessionId) return;
   try {
     await api(`/api/capture-sessions/${state.sessionId}`, {
@@ -229,6 +235,20 @@ async function finishSession(status: "completed" | "canceled"): Promise<void> {
   } catch {
     // A missing session route must never crash a finished capture.
   }
+}
+
+/**
+ * Merge a deep-detail patch onto a card record WITHOUT clobbering good card
+ * fields: a detail pass that fails to read (say) the rating must not overwrite
+ * the rating we already scraped from the card with null/undefined.
+ */
+function mergeDetail(base: RawRecord, patch: Partial<RawRecord>): RawRecord {
+  const merged: RawRecord = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null || value === undefined) continue;
+    (merged as Record<string, unknown>)[key] = value;
+  }
+  return merged;
 }
 
 /** Stable-enough dedupe key across scroll steps within one run. */
@@ -285,7 +305,7 @@ async function runCapture(): Promise<void> {
             ref: record,
           });
           if (detailRes.ok && detailRes.type === "HARVEST_DETAIL") {
-            merged = { ...record, ...detailRes.patch };
+            merged = mergeDetail(record, detailRes.patch);
           }
           await paceDelay();
         }
@@ -322,7 +342,13 @@ async function runCapture(): Promise<void> {
   } finally {
     if (token === runToken) {
       state.running = false;
-      await finishSession(state.reachedEnd ? "completed" : "canceled");
+      await finishSession(
+        state.reachedCap || state.reachedEnd
+          ? "completed"
+          : state.stoppedByUser
+            ? "stopped"
+            : "canceled",
+      );
       void syncNow();
     }
   }
@@ -375,7 +401,8 @@ async function handleStart(cmd: {
 async function handleStop(): Promise<CommandResult> {
   runToken += 1;
   state.running = false;
-  await finishSession("canceled");
+  state.stoppedByUser = true;
+  await finishSession("stopped");
   void syncNow();
   return { ok: true, status: await buildStatus() };
 }

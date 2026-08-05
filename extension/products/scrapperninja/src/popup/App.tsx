@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   API_ORIGIN,
+  clearToken,
   getToken,
   SignInRequiredError,
 } from "../../../../shared/api";
@@ -153,6 +154,16 @@ export function App() {
     void chrome.tabs.create({ url: `${API_ORIGIN}${path}` });
   }
 
+  async function onLogout(): Promise<void> {
+    await clearToken();
+    setStatus(null);
+    setCampaigns([]);
+    setCampaignId("");
+    setError(null);
+    setNotice(null);
+    setScreen("signed-out");
+  }
+
   /* -- Screens ------------------------------------------------------------ */
 
   if (screen === "loading") {
@@ -188,6 +199,18 @@ export function App() {
 
   return (
     <Shell>
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">Signed in</span>
+        <button
+          className="text-muted-foreground hover:text-foreground underline"
+          disabled={running}
+          title={running ? "Stop the capture before logging out" : undefined}
+          onClick={() => void onLogout()}
+        >
+          Log out
+        </button>
+      </div>
+
       {tierBlocked && (
         <div className="border-destructive/40 bg-destructive/10 rounded-lg border p-3 text-xs">
           <p className="font-medium">Manual capture only</p>

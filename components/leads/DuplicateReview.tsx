@@ -155,7 +155,7 @@ export function DuplicateReview() {
   return (
     <div className="flex flex-col gap-4">
       <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
-        <span>{candidates.length} pending</span>
+        <span className="tabular-nums">1 of {candidates.length}</span>
         <span aria-hidden="true">·</span>
         <span>Matched on</span>
         {current.matchedOn.map((m) => (

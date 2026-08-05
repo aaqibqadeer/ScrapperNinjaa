@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import {
+  AssignPlanDialog,
+  type PlanOption,
+} from "@/components/admin/AssignPlanDialog";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { RowNumberCell } from "@/components/shared/RowNumberCell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +30,7 @@ interface UserRow {
   emailVerified: boolean;
   isSuperAdmin: boolean;
   isSupportAdmin: boolean;
+  organizationId: string | null;
   planName: string;
   subscriptionStatus: string | null;
   usageThisMonth: number;
@@ -33,12 +39,19 @@ interface UserRow {
 interface AdminUsersTableProps {
   /** Suspend/ban/delete are super-admin-only; support admins just view. */
   isSuperAdmin: boolean;
+  /** Assignable plans (super-admin "Assign plan"); empty hides the action. */
+  plans?: PlanOption[];
 }
+
+const PAGE_SIZE = 25;
 
 /** Platform user management: search, plan tier, monthly usage, and (for
  * super admins) suspend/ban/reactivate + deletion trigger — all with audited
  * reasons. */
-export function AdminUsersTable({ isSuperAdmin }: AdminUsersTableProps) {
+export function AdminUsersTable({
+  isSuperAdmin,
+  plans = [],
+}: AdminUsersTableProps) {
   const [rows, setRows] = useState<UserRow[] | null>(null);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
@@ -121,6 +134,7 @@ export function AdminUsersTable({ isSuperAdmin }: AdminUsersTableProps) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10 text-right">#</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Plan</TableHead>
@@ -129,8 +143,15 @@ export function AdminUsersTable({ isSuperAdmin }: AdminUsersTableProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
+                {rows.map((row, index) => (
                   <TableRow key={row.id}>
+                    <TableCell className="text-right">
+                      <RowNumberCell
+                        index={index}
+                        page={offset / PAGE_SIZE + 1}
+                        pageSize={PAGE_SIZE}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="flex items-center gap-1.5 text-sm">
@@ -171,6 +192,14 @@ export function AdminUsersTable({ isSuperAdmin }: AdminUsersTableProps) {
                     {isSuperAdmin && (
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          {plans.length > 0 && row.organizationId && (
+                            <AssignPlanDialog
+                              organizationId={row.organizationId}
+                              plans={plans}
+                              targetLabel={row.email}
+                              onAssigned={() => void load(search, offset)}
+                            />
+                          )}
                           {row.status === "active" ? (
                             <>
                               <ConfirmDialog

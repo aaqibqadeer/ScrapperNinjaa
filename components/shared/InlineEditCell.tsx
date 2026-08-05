@@ -19,6 +19,11 @@ export interface InlineEditCellProps {
   /** Options for `select` type. */
   options?: InlineEditOption[];
   readOnly?: boolean;
+  /**
+   * Render the input directly (no double-click gate) and keep it open — used by
+   * the table's batch "edit mode" so every editable cell on the page is an input.
+   */
+  alwaysEdit?: boolean;
   className?: string;
   /** Shown (muted) when the value is empty and not editing. */
   placeholder?: string;
@@ -36,6 +41,7 @@ export function InlineEditCell({
   type = "text",
   options = [],
   readOnly = false,
+  alwaysEdit = false,
   className,
   placeholder = "—",
 }: InlineEditCellProps) {
@@ -43,6 +49,8 @@ export function InlineEditCell({
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
+
+  const showInput = editing || alwaysEdit;
 
   useEffect(() => {
     if (!editing) setDraft(value);
@@ -55,7 +63,7 @@ export function InlineEditCell({
   }, [editing, type]);
 
   function commit(next: string) {
-    setEditing(false);
+    if (!alwaysEdit) setEditing(false);
     if (next === value) return;
     setDraft(next);
     void onSave(next);
@@ -63,7 +71,7 @@ export function InlineEditCell({
 
   function cancel() {
     setDraft(value);
-    setEditing(false);
+    if (!alwaysEdit) setEditing(false);
   }
 
   if (readOnly) {
@@ -74,7 +82,7 @@ export function InlineEditCell({
     );
   }
 
-  if (editing) {
+  if (showInput) {
     if (type === "select") {
       return (
         <Select
@@ -83,7 +91,9 @@ export function InlineEditCell({
           value={draft}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => commit(e.target.value)}
-          onBlur={() => setEditing(false)}
+          onBlur={() => {
+            if (!alwaysEdit) setEditing(false);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Escape") cancel();
           }}

@@ -332,6 +332,7 @@ interface LeadDoc {
   captured_at: Date;
   captured_by_user_id: mongoose.Types.ObjectId | null;
   client_capture_id: string | null;
+  capture_session_id: mongoose.Types.ObjectId | null;
   // captured
   business_name: string;
   category: string | null;
@@ -874,6 +875,11 @@ const leadSchemaMongo = new Schema<LeadDoc>(
       default: null,
     },
     client_capture_id: { type: String, default: null },
+    capture_session_id: {
+      type: Schema.Types.ObjectId,
+      ref: "CaptureSession",
+      default: null,
+    },
     // captured
     business_name: { type: String, required: true },
     category: { type: String, default: null },
@@ -934,6 +940,7 @@ leadSchemaMongo.index({ organization_id: 1, status: 1 });
 leadSchemaMongo.index({ organization_id: 1, phone_e164: 1 });
 leadSchemaMongo.index({ organization_id: 1, website_domain: 1 });
 leadSchemaMongo.index({ organization_id: 1, campaign_ids: 1 });
+leadSchemaMongo.index({ organization_id: 1, capture_session_id: 1 });
 leadSchemaMongo.index({ organization_id: 1, score: -1 });
 
 const campaignSchemaMongo = new Schema<CampaignDoc>(
@@ -1462,6 +1469,9 @@ function toLead(doc: LeadDoc): Lead {
       ? doc.captured_by_user_id.toString()
       : null,
     clientCaptureId: doc.client_capture_id ?? null,
+    captureSessionId: doc.capture_session_id
+      ? doc.capture_session_id.toString()
+      : null,
     businessName: doc.business_name,
     category: doc.category ?? null,
     categories: doc.categories ?? [],
@@ -1673,6 +1683,10 @@ function leadWriteDoc(patch: UpdateLead): Record<string, unknown> {
       : null;
   if (patch.clientCaptureId !== undefined)
     u.client_capture_id = patch.clientCaptureId ?? null;
+  if (patch.captureSessionId !== undefined)
+    u.capture_session_id = patch.captureSessionId
+      ? new mongoose.Types.ObjectId(patch.captureSessionId)
+      : null;
   if (patch.businessName !== undefined) u.business_name = patch.businessName;
   if (patch.category !== undefined) u.category = patch.category ?? null;
   if (patch.categories !== undefined) u.categories = patch.categories;
@@ -2835,6 +2849,14 @@ export class MongoAdapter implements DatabaseAdapter {
     // The capture key + org are controlled here, not by the write payload, so
     // they never collide between $set and $setOnInsert.
     delete write.client_capture_id;
+    // The capture session is set on create only; a re-synced record must not
+    // have its original session overwritten by a later run (set-if-missing is
+    // handled below for pre-session rows).
+    const captureSessionId = write.capture_session_id as
+      | mongoose.Types.ObjectId
+      | null
+      | undefined;
+    delete write.capture_session_id;
     const orgObjectId = new mongoose.Types.ObjectId(orgId);
     const existing = await LeadModel.findOne({
       organization_id: orgObjectId,
@@ -2850,12 +2872,23 @@ export class MongoAdapter implements DatabaseAdapter {
         $setOnInsert: {
           organization_id: orgObjectId,
           client_capture_id: clientCaptureId,
+          ...(captureSessionId
+            ? { capture_session_id: captureSessionId }
+            : {}),
         },
       },
       { new: true, upsert: true },
     )
       .lean<LeadDoc>()
       .exec();
+    // Backfill the session on an existing row that never had one.
+    if (existing && captureSessionId && !doc.capture_session_id) {
+      await LeadModel.updateOne(
+        { _id: doc._id, capture_session_id: null },
+        { $set: { capture_session_id: captureSessionId } },
+      ).exec();
+      doc.capture_session_id = captureSessionId;
+    }
     return { lead: toLead(doc as LeadDoc), created: !existing };
   }
 

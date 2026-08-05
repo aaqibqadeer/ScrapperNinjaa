@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { formatDateTime } from "@/lib/format/datetime";
 import { LEAD_STATUSES, type Lead, type LeadSource } from "@/lib/db/schema";
 
 export interface LeadDetailDrawerProps {
@@ -16,13 +17,6 @@ export interface LeadDetailDrawerProps {
   onOpenChange: (open: boolean) => void;
   /** Called with the updated lead after a successful save. */
   onUpdated: (lead: Lead) => void;
-}
-
-function formatDate(value: Date | string | null | undefined): string {
-  if (!value) return "—";
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString();
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -192,7 +186,7 @@ export function LeadDetailDrawer({
             </p>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Source">{lead.sourceType}</Field>
-              <Field label="Captured">{formatDate(lead.capturedAt)}</Field>
+              <Field label="Captured">{formatDateTime(lead.capturedAt)}</Field>
               <Field label="Source URL">
                 {lead.sourceUrl ? (
                   <a
@@ -207,7 +201,7 @@ export function LeadDetailDrawer({
                   "—"
                 )}
               </Field>
-              <Field label="Created">{formatDate(lead.createdAt)}</Field>
+              <Field label="Created">{formatDateTime(lead.createdAt)}</Field>
             </div>
 
             {sources !== null && sources.length > 0 && (
@@ -224,7 +218,7 @@ export function LeadDetailDrawer({
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium">{source.sourceType}</span>
                         <span className="text-muted-foreground text-xs">
-                          {formatDate(source.capturedAt)}
+                          {formatDateTime(source.capturedAt)}
                         </span>
                       </div>
                       {source.sourceUrl ? (

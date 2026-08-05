@@ -65,6 +65,9 @@ export const leadQueryParamsSchema = z.object({
   /** Global search across businessName / phone / website / notes. */
   q: z.string().min(1).optional(),
   campaignId: z.string().min(1).optional(),
+  /** Restrict to leads captured in one capture session (the sessions-table
+   * drill-down). Filters `capture_session_id`. */
+  sessionId: z.string().min(1).optional(),
   status: leadStatusSchema.optional(),
   sourceType: leadSourceTypeSchema.optional(),
   includeJunk: z.boolean().default(false),
@@ -211,6 +214,7 @@ export function buildLeadQuery(
 
   // Top-level scalar filters.
   if (params.campaignId) filter.campaign_ids = params.campaignId;
+  if (params.sessionId) filter.capture_session_id = params.sessionId;
   if (params.sourceType) filter.source_type = params.sourceType;
   if (params.status) filter[STATUS_DB_FIELD] = params.status;
 
@@ -262,7 +266,8 @@ export function buildLeadQuery(
 /**
  * Extract a raw params object from a URL query string, then validate it with
  * `leadQueryParamsSchema`. Recognizes:
- *   - page, pageSize, sort, dir, q, campaignId, status, sourceType, includeJunk
+ *   - page, pageSize, sort, dir, q, campaignId, sessionId, status, sourceType,
+ *     includeJunk
  *   - f.<col>=text                     → contains
  *   - f.<col>.min / f.<col>.max=…      → range bounds
  *   - f.<col>.in=a,b,c                 → set membership
@@ -323,6 +328,8 @@ export function parseLeadQueryFromSearchParams(
   if (q !== null && q.length > 0) raw.q = q;
   const campaignId = searchParams.get("campaignId");
   if (campaignId !== null && campaignId.length > 0) raw.campaignId = campaignId;
+  const sessionId = searchParams.get("sessionId");
+  if (sessionId !== null && sessionId.length > 0) raw.sessionId = sessionId;
   const status = searchParams.get("status");
   if (status !== null && status.length > 0) raw.status = status;
   const sourceType = searchParams.get("sourceType");

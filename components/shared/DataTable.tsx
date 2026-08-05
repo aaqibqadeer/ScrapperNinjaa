@@ -14,7 +14,9 @@ export interface DataTableColumn<T> {
   /** Stable key for the column. */
   key: string;
   header: ReactNode;
-  cell: (row: T) => ReactNode;
+  /** `index` is the 0-based position within the rendered `rows` (for a `#`
+   * column — see `RowNumberCell`). */
+  cell: (row: T, index: number) => ReactNode;
   className?: string;
 }
 
@@ -24,6 +26,9 @@ export interface DataTableProps<T> {
   getRowKey: (row: T) => string;
   /** Rendered when `rows` is empty (defaults to a simple EmptyState). */
   empty?: ReactNode;
+  /** When set, rows become clickable (cursor + hover); cells that shouldn't
+   * trigger it (links, buttons) must `stopPropagation` themselves. */
+  onRowClick?: (row: T, index: number) => void;
 }
 
 /**
@@ -36,6 +41,7 @@ export function DataTable<T>({
   rows,
   getRowKey,
   empty,
+  onRowClick,
 }: DataTableProps<T>) {
   if (rows.length === 0) {
     return <>{empty ?? <EmptyState title="Nothing here yet." />}</>;
@@ -53,11 +59,15 @@ export function DataTable<T>({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {rows.map((row) => (
-          <TableRow key={getRowKey(row)}>
+        {rows.map((row, index) => (
+          <TableRow
+            key={getRowKey(row)}
+            className={onRowClick ? "cursor-pointer" : undefined}
+            onClick={onRowClick ? () => onRowClick(row, index) : undefined}
+          >
             {columns.map((column) => (
               <TableCell key={column.key} className={column.className}>
-                {column.cell(row)}
+                {column.cell(row, index)}
               </TableCell>
             ))}
           </TableRow>

@@ -1,4 +1,5 @@
 import { AdminUsersTable } from "@/components/admin/AdminUsersTable";
+import type { PlanOption } from "@/components/admin/AssignPlanDialog";
 import {
   Card,
   CardContent,
@@ -6,7 +7,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { features } from "@/config/features";
 import { requirePlatformStaff } from "@/lib/auth/roles";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +22,16 @@ export const dynamic = "force-dynamic";
 export default async function AdminUsersPage() {
   const session = await requirePlatformStaff();
 
+  // Super admins can force-assign any active plan (no Stripe) — only meaningful
+  // when payments is on (subscriptions/entitlements are payments-gated).
+  const plans: PlanOption[] =
+    session.user.isSuperAdmin && features.payments.enabled
+      ? (await db.listPlans())
+          .filter((plan) => plan.isActive)
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map((plan) => ({ id: plan.id, slug: plan.slug, name: plan.name }))
+      : [];
+
   return (
     <Card>
       <CardHeader>
@@ -28,7 +41,10 @@ export default async function AdminUsersPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <AdminUsersTable isSuperAdmin={session.user.isSuperAdmin} />
+        <AdminUsersTable
+          isSuperAdmin={session.user.isSuperAdmin}
+          plans={plans}
+        />
       </CardContent>
     </Card>
   );

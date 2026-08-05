@@ -122,11 +122,14 @@ export function CampaignsManager() {
         />
       ) : (
         <ul className="divide-border divide-y rounded-md border">
-          {campaigns.map((campaign) => (
+          {campaigns.map((campaign, index) => (
             <li
               key={campaign.id}
               className="flex flex-wrap items-center gap-3 px-4 py-3"
             >
+              <span className="text-muted-foreground tabular-nums w-6 text-right text-sm">
+                {index + 1}
+              </span>
               <div className="flex min-w-40 flex-col">
                 <span className="font-medium">{campaign.name}</span>
                 {campaign.description && (

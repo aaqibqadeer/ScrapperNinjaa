@@ -3,17 +3,25 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import {
+  AssignPlanDialog,
+  type PlanOption,
+} from "@/components/admin/AssignPlanDialog";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { RowNumberCell } from "@/components/shared/RowNumberCell";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatDate } from "@/lib/format/datetime";
 
 export interface SubscriptionRow {
   id: string;
+  organizationId: string;
   orgName: string;
+  planId: string | null;
   planName: string;
   status: string;
   currentPeriodEnd: string | null;
@@ -35,14 +43,17 @@ const STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
 
 interface SubscriptionsTableProps {
   rows: SubscriptionRow[];
-  /** Cancel is super-admin-only; support admins see refunds only. */
+  /** Cancel + assign-plan are super-admin-only; support admins see refunds only. */
   isSuperAdmin: boolean;
+  /** Assignable plans (super-admin "Change plan"); empty hides the action. */
+  plans?: PlanOption[];
 }
 
-/** Cross-user subscription list with refund (staff) + cancel (super-admin). */
+/** Cross-user subscription list with refund (staff) + cancel/assign (super-admin). */
 export function SubscriptionsTable({
   rows,
   isSuperAdmin,
+  plans = [],
 }: SubscriptionsTableProps) {
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
@@ -105,6 +116,12 @@ export function SubscriptionsTable({
   }
 
   const columns: DataTableColumn<SubscriptionRow>[] = [
+    {
+      key: "num",
+      header: "#",
+      className: "w-10 text-right",
+      cell: (_r, index) => <RowNumberCell index={index} />,
+    },
     { key: "org", header: "Organization", cell: (r) => r.orgName },
     { key: "plan", header: "Plan", cell: (r) => r.planName },
     {
@@ -120,10 +137,7 @@ export function SubscriptionsTable({
     {
       key: "period",
       header: "Renews",
-      cell: (r) =>
-        r.currentPeriodEnd
-          ? new Date(r.currentPeriodEnd).toLocaleDateString()
-          : "—",
+      cell: (r) => formatDate(r.currentPeriodEnd),
     },
     {
       key: "actions",
@@ -131,6 +145,16 @@ export function SubscriptionsTable({
       className: "text-right",
       cell: (r) => (
         <div className="flex justify-end gap-1">
+          {isSuperAdmin && plans.length > 0 && (
+            <AssignPlanDialog
+              organizationId={r.organizationId}
+              plans={plans}
+              currentPlanId={r.planId}
+              targetLabel={r.orgName}
+              triggerLabel="Change plan"
+              onAssigned={() => window.location.reload()}
+            />
+          )}
           {isSuperAdmin && (
             <ConfirmDialog
               destructive

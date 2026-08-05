@@ -16,6 +16,36 @@ normalize/dedupe/tech/render-prompt/merge. This lands the backend the Phase 3 UI
 (built earlier this branch: `components/jobs/*`, `/leads/duplicates`,
 `/leads/prompts`) was calling. typecheck + lint + `npm test` (107) pass._
 
+## ScrapperNinja fixes — on `cursor/scrapperninja-fixes-ba86` (this slice)
+
+- **Super-admin force-assign plan (no Stripe)** — `POST /api/admin/subscriptions/assign`
+  (super-admin) upserts the org's subscription to `active` with the chosen
+  `planId` so `getEffectivePlan` resolves immediately (Stripe ids untouched),
+  audited via a new `assign_plan` admin action. Shared `AssignPlanDialog` wires
+  it into `AdminUsersTable` + `SubscriptionsTable` (pages load active plans;
+  `lib/admin/users` now exposes `organizationId`).
+- **Capture status `stopped`** — added to `CAPTURE_SESSION_STATUSES` (a normal
+  user mid-run stop vs a true `canceled` abort). Extension marks handleStop
+  `stopped`, cap/end reached `completed`, errors `canceled`; `mergeDetail` stops
+  deep-detail nulls clobbering good card fields.
+- **Lead capture-session provenance** — optional `lead.captureSessionId` (Mongo
+  `capture_session_id`, indexed by `(organization_id, capture_session_id)`), set
+  on ingest create + back-filled on upsert, also stashed on `lead_sources`
+  rawPayload. `leadQueryParamsSchema` gains a `sessionId` filter → the sessions
+  table drills into `/leads?sessionId=…`.
+- **Shared UI** — `lib/format/datetime.ts` (`formatDateTime`/`formatDate`) and
+  `components/shared/RowNumberCell.tsx` (offset-aware `#` column); `DataTable`
+  gains index-aware cells + `onRowClick`. `CaptureSessionsTable` shows campaign
+  name + clickable rows.
+- **Extension** — popup gains a Log out button (`clearToken` + reset, disabled
+  mid-capture); Google Maps selectors gain data-item-id/aria-label fallbacks and
+  deep mode retries the detail read once when phone+website are both empty; seed
+  source pack mirrors the bundled keys.
+- Verified: `NEXT_PUBLIC_PRODUCT=scrapperninja npm run typecheck` + `npm run lint`
+  + extension `tsc` all green (not browser-run here).
+- **Not this slice** (another agent owns): `LeadsTable` URL sync / edit mode /
+  add-lead form / CSV auto columns — but the `sessionId` query layer is wired.
+
 ## What this repo is
 
 **One codebase, two products** (`docs/guides/two-product-production-plan.md`).

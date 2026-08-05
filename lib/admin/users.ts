@@ -16,6 +16,9 @@ export interface AdminUserRow {
   emailVerified: boolean;
   isSuperAdmin: boolean;
   isSupportAdmin: boolean;
+  /** The user's default org (the billing entity) — null if none resolved.
+   * Powers the super-admin "Assign plan" action. */
+  organizationId: string | null;
   planName: string;
   subscriptionStatus: string | null;
   usageThisMonth: number;
@@ -71,6 +74,7 @@ export async function listUsersWithBilling(params: {
       emailVerified: Boolean(user.emailVerifiedAt),
       isSuperAdmin: user.isSuperAdmin,
       isSupportAdmin: user.isSupportAdmin,
+      organizationId: orgId ?? null,
       planName: plan?.name ?? "Free",
       subscriptionStatus: subscription?.status ?? null,
       usageThisMonth: usage.get(user.id) ?? 0,

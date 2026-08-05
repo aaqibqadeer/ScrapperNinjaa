@@ -166,7 +166,13 @@ export const googleMapsAdapter: SourceAdapter = {
       return Boolean(name);
     }, 5000);
     await sleep(250);
-    const patch = readDetail(ctx.pack);
+    let patch = readDetail(ctx.pack);
+    // The contact rows (phone/website) render a beat after the name; retry once
+    // when both are still empty before giving up on this place.
+    if (!patch.phone && !patch.website) {
+      await sleep(600);
+      patch = readDetail(ctx.pack);
+    }
     // Return to the results list so the next card is reachable.
     const back = pick(document, sel(ctx.pack, "backButton")) as
       | HTMLElement
