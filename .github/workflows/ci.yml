@@ -32,7 +32,7 @@ jobs:
       - name: Unit tests
         run: npm test
         env:
-          NEXT_PUBLIC_PRODUCT: applyninja
+          NEXT_PUBLIC_PRODUCT: scrapperninja
 
       # `npm run format:check` is deliberately NOT a gate: the repo has never
       # been fully Prettier-clean (44 files differ today), so adding it would
@@ -51,7 +51,7 @@ jobs:
           NEXT_PUBLIC_APP_URL: https://example.com
           # Identity registry (config/products.ts) — required even when
           # SKIP_ENV_VALIDATION bypasses Zod; absence throws at module load.
-          NEXT_PUBLIC_PRODUCT: applyninja
+          NEXT_PUBLIC_PRODUCT: scrapperninja
 
       # The extension is a separate package (not an npm workspace), so its deps
       # are installed on their own. The build scripts no longer install

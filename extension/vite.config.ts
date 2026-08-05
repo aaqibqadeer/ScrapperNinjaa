@@ -1,26 +1,14 @@
 /**
- * Vite build for the MV3 extensions — parameterised by product.
+ * Vite build for the ScrapperNinja MV3 extension.
  *
- * This one config builds TWO independent extensions from a shared codebase:
+ * PRODUCT must be `scrapperninja` (defaults in build.mjs). Output:
+ * `extension/dist/scrapperninja/`.
  *
- *   PRODUCT=applyninja      -> dist/applyninja/
- *   PRODUCT=scrapperninja   -> dist/scrapperninja/
+ * Popup + service worker live under `products/scrapperninja/`. Shared code
+ * (API client, types, popup CSS) lives in `extension/shared/`.
  *
- * PRODUCT is read from the environment; an unknown or missing value fails the
- * build loudly, because a silent default would ship the wrong extension.
- *
- * Each product owns its own popup.html, service worker (src/background.ts) and
- * manifest.template.json under products/<product>/. Shared code (the API
- * client, response types, the token-based popup CSS) lives in extension/shared/
- * and is imported via relative paths.
- *
- * Backend origin: VITE_API_ORIGIN (defaults to http://localhost:3000). It lands
- * in both the manifest host_permissions and the API client via __API_ORIGIN__.
- *
- * MV3 content scripts CANNOT be ES modules, but this build emits the popup and
- * service worker as format "es" and rollup cannot mix formats in one pass. So
- * ScrapperNinja's content script is built by a SECOND pass — see
- * vite.content.config.ts.
+ * MV3 content scripts cannot be ES modules — ScrapperNinja's content script is
+ * built by a second pass (`vite.content.config.ts`).
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -30,35 +18,13 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
-const PRODUCTS = ["applyninja", "scrapperninja"] as const;
-type Product = (typeof PRODUCTS)[number];
-
-function resolveProduct(): Product {
-  const value = process.env.PRODUCT;
-  if (!value || !PRODUCTS.includes(value as Product)) {
-    throw new Error(
-      `PRODUCT must be one of ${PRODUCTS.join(" | ")} (got ${
-        value ? `"${value}"` : "undefined"
-      }). Build with e.g. PRODUCT=applyninja.`,
-    );
-  }
-  return value as Product;
-}
-
-const PRODUCT = resolveProduct();
+const PRODUCT = "scrapperninja" as const;
 const PRODUCT_DIR = resolve(__dirname, "products", PRODUCT);
 
 const API_ORIGIN = process.env.VITE_API_ORIGIN ?? "http://localhost:3000";
 
-/** Toolbar icon sizes Chrome asks for, by convention. */
 const ICON_SIZES = [16, 32, 48, 128] as const;
 
-/**
- * Emit manifest.json from the product's manifest.template.json, substituting
- * the backend origin. Copies whichever icons actually exist (declaring a
- * missing icon makes Chrome refuse to load the extension). Icons are read from
- * products/<product>/icons/, falling back to the shared extension/icons/ set.
- */
 function emitManifest(): Plugin {
   return {
     name: "emit-manifest",
@@ -106,8 +72,6 @@ function emitManifest(): Plugin {
 }
 
 export default defineConfig({
-  // Root is the product folder so popup.html lands at the dist root
-  // (dist/<product>/popup.html), exactly where the manifest expects it.
   root: PRODUCT_DIR,
   plugins: [react(), tailwindcss(), emitManifest()],
   define: {

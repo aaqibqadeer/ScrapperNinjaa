@@ -1,30 +1,21 @@
 /**
- * Product-aware build entry for the extension.
+ * ScrapperNinja extension build entry.
  *
- * Usage: PRODUCT=applyninja node build.mjs
- *        PRODUCT=scrapperninja node build.mjs
+ * Usage: PRODUCT=scrapperninja node build.mjs
  *
- * Steps: type-check, then the main Vite build (popup + service worker + emitted
- * manifest). ScrapperNinja gets a SECOND Vite pass for its IIFE content script
- * (see vite.content.config.ts) because MV3 content scripts cannot be ES modules
- * and rollup cannot mix output formats in one build.
+ * Steps: type-check, main Vite build (popup + service worker + manifest), then
+ * the IIFE content-script pass (vite.content.config.ts).
  */
 
 import { spawnSync } from "node:child_process";
 
-const PRODUCTS = ["applyninja", "scrapperninja"];
-const product = process.env.PRODUCT;
+const product = process.env.PRODUCT ?? "scrapperninja";
 
-if (!product || !PRODUCTS.includes(product)) {
-  console.error(
-    `PRODUCT must be ${PRODUCTS.join("|")} (got ${
-      product ? `"${product}"` : "undefined"
-    })`,
-  );
+if (product !== "scrapperninja") {
+  console.error(`PRODUCT must be scrapperninja (got "${product}")`);
   process.exit(1);
 }
 
-/** Run a command, inheriting stdio; exit the whole build on any failure. */
 function run(command, args) {
   const result = spawnSync(command, args, {
     stdio: "inherit",
@@ -38,15 +29,8 @@ function run(command, args) {
 
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";
 
-// 1. Type-check (no emit).
 run(npx, ["tsc", "--noEmit"]);
-
-// 2. Main build: popup + service worker + manifest.
 run(npx, ["vite", "build"]);
+run(npx, ["vite", "build", "--config", "vite.content.config.ts"]);
 
-// 3. ScrapperNinja only: the IIFE content-script pass into the same dist dir.
-if (product === "scrapperninja") {
-  run(npx, ["vite", "build", "--config", "vite.content.config.ts"]);
-}
-
-console.log(`\nBuilt extension for ${product} -> dist/${product}/`);
+console.log(`\nBuilt extension -> dist/${product}/`);

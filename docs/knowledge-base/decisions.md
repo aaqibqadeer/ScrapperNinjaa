@@ -5,6 +5,16 @@
 > Recent phases stay here; older entries live in
 > [`decisions-archive.md`](./decisions-archive.md). Keep this file small.
 
+## 2026-08-05 — ScrapperNinja-only fork (drop ApplyNinjaa)
+
+This repo is **ScrapperNinja-only**, not a two-product deployment:
+
+- Removed `jobApplications`, `gmail` flags and all Apply routes/libs (profiles, applications, filters, Gmail, resume AI tasks, `extension/products/applyninja`).
+- `NEXT_PUBLIC_PRODUCT` valid value is **`scrapperninja` only** (`config/products.ts`).
+- Plan limits use scraper keys only: `leadLimit`, `campaignLimit`, `aiCallsPerMonth`, `enrichment`, `offerLines`, `dataExport`.
+- Extension release tags: `ext-scrap-v*` (not `ext-v*` / apply matrix).
+- Deleted DB collections' adapter methods (profiles, applications, job_filters, gmail_scans) per §1.5 — data in old collections is orphaned, not migrated.
+
 ## 2026-08-03 — ScrapperNinja Phase 3 UI (jobs, duplicates, prompts)
 
 UI built **against contracts** ahead of the Phase 3 backend (owned by another

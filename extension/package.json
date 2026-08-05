@@ -1,8 +1,8 @@
 {
-  "name": "applyninjaa-extension",
+  "name": "scrapperninja-extension",
   "version": "0.1.0",
   "private": true,
-  "description": "ApplyNinjaa Chrome extension (Manifest V3): job screening, fit scoring, and autofill.",
+  "description": "ScrapperNinja Chrome extension (Manifest V3): lead capture and sync.",
   "scripts": {
     "dev": "vite build --watch",
     "build": "node build.mjs",

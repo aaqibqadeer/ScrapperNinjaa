@@ -1,12 +1,10 @@
 name: Extension release
 
 # Chrome Web Store review takes hours to days, so extension releases are cut
-# independently of web deploys — tag `ext-v1.2.3` when you want one. This is
-# also why the backend must stay compatible with the PUBLISHED extension, not
-# just the one in this repo.
+# independently of web deploys — tag `ext-scrap-v1.2.3` when you want one.
 on:
   push:
-    tags: ["ext-v*"]
+    tags: ["ext-scrap-v*"]
 
 jobs:
   publish:
@@ -23,13 +21,15 @@ jobs:
 
       - name: Check the tag matches the manifest version
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#ext-v}"
-          MANIFEST_VERSION=$(node -p "require('./extension/manifest.template.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#ext-scrap-v}"
+          MANIFEST_VERSION=$(node -p "require('./extension/products/scrapperninja/manifest.template.json').version")
           if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
             echo "Tag is $TAG_VERSION but manifest.template.json says $MANIFEST_VERSION."
-            echo "The Web Store rejects a re-used version, so these must agree."
             exit 1
           fi
+
+      - name: Install extension deps
+        run: npm --prefix extension ci
 
       - name: Build
         run: npm run build:extension
@@ -37,11 +37,8 @@ jobs:
           VITE_API_ORIGIN: ${{ vars.PRODUCTION_APP_URL }}
 
       - name: Zip
-        run: cd extension/dist && zip -r ../../extension.zip .
+        run: cd extension/dist/scrapperninja && zip -r ../../../extension.zip .
 
-      # The FIRST submission must be done by hand in the Developer Dashboard
-      # (one-time $5 registration + initial review). This job only handles
-      # updates to an extension that already exists.
       - name: Upload and publish
         run: |
           npx chrome-webstore-upload-cli@3 upload \
