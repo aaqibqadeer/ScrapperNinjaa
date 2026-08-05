@@ -22,45 +22,33 @@ import type {
 } from "../adapter";
 import {
   DEFAULT_TRIAL_DAYS,
-  GMAIL_SCAN_STATUSES,
   INVITATION_STATUSES,
   ORG_ROLES,
   SUBSCRIPTION_STATUSES,
   USER_STATUSES,
   newAdminActionSchema,
-  newApplicationSchema,
   newBatchJobSchema,
   newCampaignSchema,
   newCaptureSessionSchema,
   newDuplicateCandidateSchema,
-  newGmailScanSchema,
   newInvitationSchema,
-  newJobFilterSchema,
   newLeadCustomFieldSchema,
   newLeadSchema,
   newLeadSourceSchema,
   newOfferPromptSchema,
   newOrganizationMemberSchema,
   newPlanSchema,
-  newProfileSchema,
   newSavedViewSchema,
   newSourcePackSchema,
   newSubscriptionSchema,
   type AdminAction,
-  type Application,
-  type ApplicationFilterResult,
-  type ApplicationLink,
-  type ApplicationStatus,
   type AppSettings,
   type BatchJob,
   type Campaign,
   type CaptureSession,
   type DuplicateCandidate,
-  type GmailScan,
-  type GmailScanProposal,
   type Invitation,
   type InvitationStatus,
-  type JobFilter,
   type Lead,
   type LeadAddress,
   type LeadCustomField,
@@ -68,14 +56,11 @@ import {
   type LeadSocials,
   type LeadSource,
   type NewAdminAction,
-  type NewApplication,
   type NewBatchJob,
   type NewCampaign,
   type NewCaptureSession,
   type NewDuplicateCandidate,
-  type NewGmailScan,
   type NewInvitation,
-  type NewJobFilter,
   type NewLead,
   type NewLeadCustomField,
   type NewLeadSource,
@@ -83,7 +68,6 @@ import {
   type NewOrganization,
   type NewOrganizationMember,
   type NewPlan,
-  type NewProfile,
   type NewSavedView,
   type NewSourcePack,
   type NewSubscription,
@@ -93,39 +77,25 @@ import {
   type OrganizationMember,
   type OrgRole,
   type Plan,
-  type Profile,
-  type ProfileContact,
-  type ProfileDomainPref,
-  type ProfileEducation,
-  type ProfileEeo,
-  type ProfileExperience,
-  type ProfileLinks,
-  type ProfileCustomField,
-  type ProfileProject,
   type SavedView,
   type SavedViewSort,
   type SourcePack,
   type Subscription,
-  type UpdateApplication,
   type UpdateAppSettings,
   type UpdateBatchJob,
   type UpdateCampaign,
   type UpdateCaptureSession,
   type UpdateDuplicateCandidate,
-  type UpdateGmailScan,
-  type UpdateJobFilter,
   type UpdateLead,
   type UpdateLeadCustomField,
   type UpdateOfferPrompt,
   type UpdateOrganization,
   type UpdatePlan,
-  type UpdateProfile,
   type UpdateSavedView,
   type UpdateSourcePack,
   type UpdateSubscription,
   type UpdateUser,
   type User,
-  type UserFilterSetting,
 } from "../schema";
 
 /* -- Document shapes (as stored, incl. Mongoose-managed fields) ------------ */
@@ -218,84 +188,6 @@ interface InvitationDoc {
   updatedAt: Date;
 }
 
-interface ProfileDoc {
-  _id: mongoose.Types.ObjectId;
-  organization_id: mongoose.Types.ObjectId;
-  user_id: mongoose.Types.ObjectId;
-  name: string;
-  contact: ProfileContact;
-  summary: string | null;
-  skills: string[];
-  experience: ProfileExperience[];
-  education: ProfileEducation[];
-  projects: ProfileProject[];
-  custom_fields: ProfileCustomField[];
-  knowledge_base: string;
-  links: ProfileLinks;
-  work_authorization: string | null;
-  work_arrangement: string | null;
-  employment_types: string[];
-  salary_expectation: string | null;
-  // EEO fields hold packed ciphertext (field-level encryption), never plaintext.
-  eeo: ProfileEeo | null;
-  is_default: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface ProfileDomainPrefDoc {
-  _id: mongoose.Types.ObjectId;
-  organization_id: mongoose.Types.ObjectId;
-  user_id: mongoose.Types.ObjectId;
-  domain: string;
-  profile_id: mongoose.Types.ObjectId;
-  last_used_at: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface ApplicationDoc {
-  _id: mongoose.Types.ObjectId;
-  organization_id: mongoose.Types.ObjectId;
-  user_id: mongoose.Types.ObjectId;
-  profile_id: mongoose.Types.ObjectId | null;
-  company: string;
-  role_title: string;
-  url: string | null;
-  domain: string | null;
-  platform: string | null;
-  additional_links: ApplicationLink[];
-  status: string;
-  fit_score: number | null;
-  fit_reasoning: string | null;
-  filter_results: ApplicationFilterResult[];
-  applied_at: Date;
-  notes: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface JobFilterDoc {
-  _id: mongoose.Types.ObjectId;
-  label: string;
-  type: string;
-  owner_id: mongoose.Types.ObjectId | null;
-  description: string | null;
-  is_active: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface UserFilterSettingDoc {
-  _id: mongoose.Types.ObjectId;
-  organization_id: mongoose.Types.ObjectId;
-  user_id: mongoose.Types.ObjectId;
-  filter_id: mongoose.Types.ObjectId;
-  enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 interface AdminActionDoc {
   _id: mongoose.Types.ObjectId;
   actor_user_id: mongoose.Types.ObjectId;
@@ -305,19 +197,6 @@ interface AdminActionDoc {
   target_id: string | null;
   reason: string;
   metadata: Record<string, unknown>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface GmailScanDoc {
-  _id: mongoose.Types.ObjectId;
-  organization_id: mongoose.Types.ObjectId;
-  user_id: mongoose.Types.ObjectId;
-  range_from: Date;
-  range_to: Date;
-  status: string;
-  error: string | null;
-  proposals: GmailScanProposal[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -666,143 +545,6 @@ const invitationSchema = new Schema<InvitationDoc>(
   { timestamps: true, collection: "organization_invitations" },
 );
 
-const profileSchema = new Schema<ProfileDoc>(
-  {
-    // Tenant key — indexed on every tenant-scoped collection (§1.3).
-    organization_id: {
-      type: Schema.Types.ObjectId,
-      ref: "Organization",
-      required: true,
-      index: true,
-    },
-    user_id: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    name: { type: String, required: true },
-    contact: { type: Schema.Types.Mixed, default: {} },
-    summary: { type: String, default: null },
-    skills: { type: [String], default: [] },
-    // Structured sub-documents are stored schema-less (Mixed) — their shape is
-    // enforced by the Zod domain schemas at the adapter boundary.
-    experience: { type: Schema.Types.Mixed, default: [] },
-    education: { type: Schema.Types.Mixed, default: [] },
-    projects: { type: Schema.Types.Mixed, default: [] },
-    custom_fields: { type: Schema.Types.Mixed, default: [] },
-    knowledge_base: { type: String, default: "" },
-    links: { type: Schema.Types.Mixed, default: {} },
-    work_authorization: { type: String, default: null },
-    work_arrangement: { type: String, default: null },
-    employment_types: { type: [String], default: [] },
-    salary_expectation: { type: String, default: null },
-    // Packed ciphertext only — encrypted/decrypted by the profile service.
-    eeo: { type: Schema.Types.Mixed, default: null },
-    is_default: { type: Boolean, required: true, default: false },
-  },
-  { timestamps: true, collection: "profiles" },
-);
-profileSchema.index({ user_id: 1, name: 1 }, { unique: true });
-
-const profileDomainPrefSchema = new Schema<ProfileDomainPrefDoc>(
-  {
-    organization_id: {
-      type: Schema.Types.ObjectId,
-      ref: "Organization",
-      required: true,
-      index: true,
-    },
-    user_id: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    domain: { type: String, required: true },
-    profile_id: { type: Schema.Types.ObjectId, ref: "Profile", required: true },
-    last_used_at: { type: Date, required: true },
-  },
-  { timestamps: true, collection: "profile_domain_prefs" },
-);
-profileDomainPrefSchema.index({ user_id: 1, domain: 1 }, { unique: true });
-
-const applicationSchema = new Schema<ApplicationDoc>(
-  {
-    organization_id: {
-      type: Schema.Types.ObjectId,
-      ref: "Organization",
-      required: true,
-      index: true,
-    },
-    user_id: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    profile_id: { type: Schema.Types.ObjectId, ref: "Profile", default: null },
-    company: { type: String, required: true },
-    role_title: { type: String, required: true },
-    url: { type: String, default: null },
-    domain: { type: String, default: null },
-    platform: { type: String, default: null },
-    additional_links: { type: Schema.Types.Mixed, default: [] },
-    status: { type: String, required: true, default: "Applied" },
-    fit_score: { type: Number, default: null },
-    fit_reasoning: { type: String, default: null },
-    filter_results: { type: Schema.Types.Mixed, default: [] },
-    applied_at: { type: Date, required: true },
-    notes: { type: String, default: "" },
-  },
-  { timestamps: true, collection: "applications" },
-);
-applicationSchema.index({ user_id: 1, applied_at: -1 });
-applicationSchema.index({ user_id: 1, status: 1 });
-
-const jobFilterSchema = new Schema<JobFilterDoc>(
-  {
-    label: { type: String, required: true },
-    // 'admin' = platform default (no owner); 'user' = one user's custom filter.
-    type: { type: String, required: true, index: true },
-    owner_id: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-      index: true,
-      sparse: true,
-    },
-    description: { type: String, default: null },
-    is_active: { type: Boolean, required: true, default: true },
-  },
-  { timestamps: true, collection: "job_filters" },
-);
-
-const userFilterSettingSchema = new Schema<UserFilterSettingDoc>(
-  {
-    organization_id: {
-      type: Schema.Types.ObjectId,
-      ref: "Organization",
-      required: true,
-      index: true,
-    },
-    user_id: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    filter_id: {
-      type: Schema.Types.ObjectId,
-      ref: "JobFilter",
-      required: true,
-    },
-    enabled: { type: Boolean, required: true },
-  },
-  { timestamps: true, collection: "user_filter_settings" },
-);
-userFilterSettingSchema.index({ user_id: 1, filter_id: 1 }, { unique: true });
-
 // Append-only audit log — no updates, newest-first reads.
 const adminActionSchema = new Schema<AdminActionDoc>(
   {
@@ -828,33 +570,6 @@ const adminActionSchema = new Schema<AdminActionDoc>(
   { timestamps: true, collection: "admin_actions" },
 );
 adminActionSchema.index({ createdAt: -1 });
-
-const gmailScanSchema = new Schema<GmailScanDoc>(
-  {
-    organization_id: {
-      type: Schema.Types.ObjectId,
-      ref: "Organization",
-      required: true,
-      index: true,
-    },
-    user_id: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    range_from: { type: Date, required: true },
-    range_to: { type: Date, required: true },
-    status: {
-      type: String,
-      required: true,
-      default: GMAIL_SCAN_STATUSES.running,
-    },
-    error: { type: String, default: null },
-    proposals: { type: Schema.Types.Mixed, default: [] },
-  },
-  { timestamps: true, collection: "gmail_scans" },
-);
 
 const leadSchemaMongo = new Schema<LeadDoc>(
   {
@@ -1189,25 +904,10 @@ const SubscriptionModel = model<SubscriptionDoc>(
   "Subscription",
   subscriptionSchema,
 );
-const ProfileModel = model<ProfileDoc>("Profile", profileSchema);
-const ProfileDomainPrefModel = model<ProfileDomainPrefDoc>(
-  "ProfileDomainPref",
-  profileDomainPrefSchema,
-);
-const ApplicationModel = model<ApplicationDoc>(
-  "Application",
-  applicationSchema,
-);
-const JobFilterModel = model<JobFilterDoc>("JobFilter", jobFilterSchema);
-const UserFilterSettingModel = model<UserFilterSettingDoc>(
-  "UserFilterSetting",
-  userFilterSettingSchema,
-);
 const AdminActionModel = model<AdminActionDoc>(
   "AdminAction",
   adminActionSchema,
 );
-const GmailScanModel = model<GmailScanDoc>("GmailScan", gmailScanSchema);
 const LeadModel = model<LeadDoc>("Lead", leadSchemaMongo);
 const CampaignModel = model<CampaignDoc>("Campaign", campaignSchemaMongo);
 const LeadSourceModel = model<LeadSourceDoc>(
@@ -1340,96 +1040,6 @@ function toInvitation(doc: InvitationDoc): Invitation {
   };
 }
 
-function toProfile(doc: ProfileDoc): Profile {
-  return {
-    id: doc._id.toString(),
-    organizationId: doc.organization_id.toString(),
-    userId: doc.user_id.toString(),
-    name: doc.name,
-    contact: doc.contact ?? {},
-    summary: doc.summary ?? null,
-    skills: doc.skills ?? [],
-    experience: doc.experience ?? [],
-    education: doc.education ?? [],
-    projects: doc.projects ?? [],
-    customFields: doc.custom_fields ?? [],
-    knowledgeBase: doc.knowledge_base ?? "",
-    links: doc.links ?? {},
-    workAuthorization: (doc.work_authorization ??
-      null) as Profile["workAuthorization"],
-    workArrangement: (doc.work_arrangement ??
-      null) as Profile["workArrangement"],
-    employmentTypes: (doc.employment_types ??
-      []) as Profile["employmentTypes"],
-    salaryExpectation: doc.salary_expectation ?? null,
-    eeo: doc.eeo ?? null,
-    isDefault: doc.is_default ?? false,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt,
-  };
-}
-
-function toProfileDomainPref(doc: ProfileDomainPrefDoc): ProfileDomainPref {
-  return {
-    id: doc._id.toString(),
-    organizationId: doc.organization_id.toString(),
-    userId: doc.user_id.toString(),
-    domain: doc.domain,
-    profileId: doc.profile_id.toString(),
-    lastUsedAt: doc.last_used_at,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt,
-  };
-}
-
-function toApplication(doc: ApplicationDoc): Application {
-  return {
-    id: doc._id.toString(),
-    organizationId: doc.organization_id.toString(),
-    userId: doc.user_id.toString(),
-    profileId: doc.profile_id ? doc.profile_id.toString() : null,
-    company: doc.company,
-    roleTitle: doc.role_title,
-    url: doc.url ?? null,
-    domain: doc.domain ?? null,
-    platform: doc.platform ?? null,
-    additionalLinks: doc.additional_links ?? [],
-    status: doc.status as Application["status"],
-    fitScore: doc.fit_score ?? null,
-    fitReasoning: doc.fit_reasoning ?? null,
-    filterResults: doc.filter_results ?? [],
-    appliedAt: doc.applied_at,
-    notes: doc.notes ?? "",
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt,
-  };
-}
-
-function toJobFilter(doc: JobFilterDoc): JobFilter {
-  return {
-    id: doc._id.toString(),
-    label: doc.label,
-    type: doc.type as JobFilter["type"],
-    ownerId: doc.owner_id ? doc.owner_id.toString() : null,
-    description: doc.description ?? null,
-    isActive: doc.is_active,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt,
-  };
-}
-
-function toUserFilterSetting(doc: UserFilterSettingDoc): UserFilterSetting {
-  return {
-    id: doc._id.toString(),
-    organizationId: doc.organization_id.toString(),
-    userId: doc.user_id.toString(),
-    filterId: doc.filter_id.toString(),
-    enabled: doc.enabled,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt,
-  };
-}
-
 function toAdminAction(doc: AdminActionDoc): AdminAction {
   return {
     id: doc._id.toString(),
@@ -1441,21 +1051,6 @@ function toAdminAction(doc: AdminActionDoc): AdminAction {
     reason: doc.reason ?? "",
     metadata: doc.metadata ?? {},
     createdAt: doc.createdAt,
-  };
-}
-
-function toGmailScan(doc: GmailScanDoc): GmailScan {
-  return {
-    id: doc._id.toString(),
-    organizationId: doc.organization_id.toString(),
-    userId: doc.user_id.toString(),
-    rangeFrom: doc.range_from,
-    rangeTo: doc.range_to,
-    status: doc.status as GmailScan["status"],
-    error: doc.error ?? null,
-    proposals: doc.proposals ?? [],
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt,
   };
 }
 
@@ -2297,350 +1892,6 @@ export class MongoAdapter implements DatabaseAdapter {
     return docs.map(toSubscription);
   }
 
-  /* -- Profiles (scoped by organization_id; multiple per user) ------------- */
-
-  async createProfile(input: NewProfile): Promise<Profile> {
-    await this.connect();
-    const parsed = newProfileSchema.parse(input);
-    const created = await ProfileModel.create({
-      organization_id: new mongoose.Types.ObjectId(parsed.organizationId),
-      user_id: new mongoose.Types.ObjectId(parsed.userId),
-      name: parsed.name,
-      contact: parsed.contact,
-      summary: parsed.summary ?? null,
-      skills: parsed.skills,
-      experience: parsed.experience,
-      education: parsed.education,
-      projects: parsed.projects,
-      custom_fields: parsed.customFields,
-      knowledge_base: parsed.knowledgeBase,
-      links: parsed.links,
-      work_authorization: parsed.workAuthorization ?? null,
-      work_arrangement: parsed.workArrangement ?? null,
-      employment_types: parsed.employmentTypes,
-      salary_expectation: parsed.salaryExpectation ?? null,
-      eeo: parsed.eeo ?? null,
-      is_default: parsed.isDefault,
-    });
-    return toProfile(created.toObject<ProfileDoc>());
-  }
-
-  async getProfileById(id: string): Promise<Profile | null> {
-    await this.connect();
-    const doc = await ProfileModel.findById(id).lean<ProfileDoc>().exec();
-    return doc ? toProfile(doc) : null;
-  }
-
-  async listProfilesForUser(userId: string): Promise<Profile[]> {
-    await this.connect();
-    const docs = await ProfileModel.find({ user_id: userId })
-      .sort({ createdAt: 1 })
-      .lean<ProfileDoc[]>()
-      .exec();
-    return docs.map(toProfile);
-  }
-
-  async updateProfile(id: string, patch: UpdateProfile): Promise<Profile> {
-    await this.connect();
-    const update: Record<string, unknown> = {};
-    if (patch.name !== undefined) update.name = patch.name;
-    if (patch.contact !== undefined) update.contact = patch.contact;
-    if (patch.summary !== undefined) update.summary = patch.summary ?? null;
-    if (patch.skills !== undefined) update.skills = patch.skills;
-    if (patch.experience !== undefined) update.experience = patch.experience;
-    if (patch.education !== undefined) update.education = patch.education;
-    if (patch.projects !== undefined) update.projects = patch.projects;
-    if (patch.customFields !== undefined)
-      update.custom_fields = patch.customFields;
-    if (patch.knowledgeBase !== undefined)
-      update.knowledge_base = patch.knowledgeBase;
-    if (patch.links !== undefined) update.links = patch.links;
-    if (patch.workAuthorization !== undefined)
-      update.work_authorization = patch.workAuthorization ?? null;
-    if (patch.workArrangement !== undefined)
-      update.work_arrangement = patch.workArrangement ?? null;
-    if (patch.employmentTypes !== undefined)
-      update.employment_types = patch.employmentTypes;
-    if (patch.salaryExpectation !== undefined)
-      update.salary_expectation = patch.salaryExpectation ?? null;
-    if (patch.eeo !== undefined) update.eeo = patch.eeo ?? null;
-    if (patch.isDefault !== undefined) update.is_default = patch.isDefault;
-    const doc = await ProfileModel.findByIdAndUpdate(id, update, { new: true })
-      .lean<ProfileDoc>()
-      .exec();
-    if (!doc) throw new Error(`mongo updateProfile: profile ${id} not found`);
-    return toProfile(doc);
-  }
-
-  async deleteProfile(id: string): Promise<void> {
-    await this.connect();
-    await ProfileModel.findByIdAndDelete(id).exec();
-    await ProfileDomainPrefModel.deleteMany({ profile_id: id }).exec();
-  }
-
-  /* -- Profile domain prefs ------------------------------------------------ */
-
-  async setProfileDomainPref(
-    organizationId: string,
-    userId: string,
-    domain: string,
-    profileId: string,
-  ): Promise<ProfileDomainPref> {
-    await this.connect();
-    const doc = await ProfileDomainPrefModel.findOneAndUpdate(
-      {
-        user_id: new mongoose.Types.ObjectId(userId),
-        domain,
-      },
-      {
-        $set: {
-          profile_id: new mongoose.Types.ObjectId(profileId),
-          last_used_at: new Date(),
-        },
-        $setOnInsert: {
-          organization_id: new mongoose.Types.ObjectId(organizationId),
-        },
-      },
-      { new: true, upsert: true },
-    )
-      .lean<ProfileDomainPrefDoc>()
-      .exec();
-    return toProfileDomainPref(doc as ProfileDomainPrefDoc);
-  }
-
-  async getProfileDomainPref(
-    userId: string,
-    domain: string,
-  ): Promise<ProfileDomainPref | null> {
-    await this.connect();
-    const doc = await ProfileDomainPrefModel.findOne({
-      user_id: userId,
-      domain,
-    })
-      .lean<ProfileDomainPrefDoc>()
-      .exec();
-    return doc ? toProfileDomainPref(doc) : null;
-  }
-
-  /* -- Applications (scoped by organization_id) ---------------------------- */
-
-  async createApplication(input: NewApplication): Promise<Application> {
-    await this.connect();
-    const parsed = newApplicationSchema.parse(input);
-    const created = await ApplicationModel.create({
-      organization_id: new mongoose.Types.ObjectId(parsed.organizationId),
-      user_id: new mongoose.Types.ObjectId(parsed.userId),
-      profile_id: parsed.profileId
-        ? new mongoose.Types.ObjectId(parsed.profileId)
-        : null,
-      company: parsed.company,
-      role_title: parsed.roleTitle,
-      url: parsed.url ?? null,
-      domain: parsed.domain ?? null,
-      platform: parsed.platform ?? null,
-      additional_links: parsed.additionalLinks,
-      status: parsed.status,
-      fit_score: parsed.fitScore ?? null,
-      fit_reasoning: parsed.fitReasoning ?? null,
-      filter_results: parsed.filterResults,
-      applied_at: parsed.appliedAt,
-      notes: parsed.notes,
-    });
-    return toApplication(created.toObject<ApplicationDoc>());
-  }
-
-  async getApplicationById(id: string): Promise<Application | null> {
-    await this.connect();
-    const doc = await ApplicationModel.findById(id)
-      .lean<ApplicationDoc>()
-      .exec();
-    return doc ? toApplication(doc) : null;
-  }
-
-  async listApplicationsForUser(userId: string): Promise<Application[]> {
-    await this.connect();
-    const docs = await ApplicationModel.find({ user_id: userId })
-      .sort({ applied_at: -1 })
-      .lean<ApplicationDoc[]>()
-      .exec();
-    return docs.map(toApplication);
-  }
-
-  async updateApplication(
-    id: string,
-    patch: UpdateApplication,
-  ): Promise<Application> {
-    await this.connect();
-    const update: Record<string, unknown> = {};
-    if (patch.profileId !== undefined)
-      update.profile_id = patch.profileId
-        ? new mongoose.Types.ObjectId(patch.profileId)
-        : null;
-    if (patch.company !== undefined) update.company = patch.company;
-    if (patch.roleTitle !== undefined) update.role_title = patch.roleTitle;
-    if (patch.url !== undefined) update.url = patch.url ?? null;
-    if (patch.domain !== undefined) update.domain = patch.domain ?? null;
-    if (patch.platform !== undefined) update.platform = patch.platform ?? null;
-    if (patch.additionalLinks !== undefined)
-      update.additional_links = patch.additionalLinks;
-    if (patch.status !== undefined) update.status = patch.status;
-    if (patch.fitScore !== undefined) update.fit_score = patch.fitScore ?? null;
-    if (patch.fitReasoning !== undefined)
-      update.fit_reasoning = patch.fitReasoning ?? null;
-    if (patch.filterResults !== undefined)
-      update.filter_results = patch.filterResults;
-    if (patch.appliedAt !== undefined) update.applied_at = patch.appliedAt;
-    if (patch.notes !== undefined) update.notes = patch.notes;
-    const doc = await ApplicationModel.findByIdAndUpdate(id, update, {
-      new: true,
-    })
-      .lean<ApplicationDoc>()
-      .exec();
-    if (!doc) throw new Error(`mongo updateApplication: ${id} not found`);
-    return toApplication(doc);
-  }
-
-  async deleteApplication(id: string): Promise<void> {
-    await this.connect();
-    await ApplicationModel.findByIdAndDelete(id).exec();
-  }
-
-  async deleteApplicationsForUser(
-    userId: string,
-    ids: string[],
-  ): Promise<number> {
-    await this.connect();
-    if (ids.length === 0) return 0;
-    const result = await ApplicationModel.deleteMany({
-      user_id: new mongoose.Types.ObjectId(userId),
-      _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) },
-    }).exec();
-    return result.deletedCount ?? 0;
-  }
-
-  async updateApplicationsStatusForUser(
-    userId: string,
-    ids: string[],
-    status: ApplicationStatus,
-  ): Promise<number> {
-    await this.connect();
-    if (ids.length === 0) return 0;
-    const result = await ApplicationModel.updateMany(
-      {
-        user_id: new mongoose.Types.ObjectId(userId),
-        _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) },
-      },
-      { status },
-    ).exec();
-    return result.modifiedCount ?? 0;
-  }
-
-  /* -- Job filters ---------------------------------------------------------- */
-
-  async createJobFilter(input: NewJobFilter): Promise<JobFilter> {
-    await this.connect();
-    const parsed = newJobFilterSchema.parse(input);
-    const created = await JobFilterModel.create({
-      label: parsed.label,
-      type: parsed.type,
-      owner_id: parsed.ownerId
-        ? new mongoose.Types.ObjectId(parsed.ownerId)
-        : null,
-      description: parsed.description ?? null,
-      is_active: parsed.isActive,
-    });
-    return toJobFilter(created.toObject<JobFilterDoc>());
-  }
-
-  async getJobFilterById(id: string): Promise<JobFilter | null> {
-    await this.connect();
-    const doc = await JobFilterModel.findById(id).lean<JobFilterDoc>().exec();
-    return doc ? toJobFilter(doc) : null;
-  }
-
-  async listAdminJobFilters(): Promise<JobFilter[]> {
-    await this.connect();
-    const docs = await JobFilterModel.find({ type: "admin" })
-      .sort({ createdAt: 1 })
-      .lean<JobFilterDoc[]>()
-      .exec();
-    return docs.map(toJobFilter);
-  }
-
-  async listJobFiltersForUser(userId: string): Promise<JobFilter[]> {
-    await this.connect();
-    const docs = await JobFilterModel.find({
-      $or: [
-        { type: "admin", is_active: true },
-        { type: "user", owner_id: new mongoose.Types.ObjectId(userId) },
-      ],
-    })
-      .sort({ createdAt: 1 })
-      .lean<JobFilterDoc[]>()
-      .exec();
-    return docs.map(toJobFilter);
-  }
-
-  async updateJobFilter(
-    id: string,
-    patch: UpdateJobFilter,
-  ): Promise<JobFilter> {
-    await this.connect();
-    const update: Record<string, unknown> = {};
-    if (patch.label !== undefined) update.label = patch.label;
-    if (patch.description !== undefined)
-      update.description = patch.description ?? null;
-    if (patch.isActive !== undefined) update.is_active = patch.isActive;
-    const doc = await JobFilterModel.findByIdAndUpdate(id, update, {
-      new: true,
-    })
-      .lean<JobFilterDoc>()
-      .exec();
-    if (!doc) throw new Error(`mongo updateJobFilter: ${id} not found`);
-    return toJobFilter(doc);
-  }
-
-  async deleteJobFilter(id: string): Promise<void> {
-    await this.connect();
-    await JobFilterModel.findByIdAndDelete(id).exec();
-    await UserFilterSettingModel.deleteMany({ filter_id: id }).exec();
-  }
-
-  /* -- User filter settings ------------------------------------------------- */
-
-  async setUserFilterEnabled(
-    organizationId: string,
-    userId: string,
-    filterId: string,
-    enabled: boolean,
-  ): Promise<UserFilterSetting> {
-    await this.connect();
-    const doc = await UserFilterSettingModel.findOneAndUpdate(
-      {
-        user_id: new mongoose.Types.ObjectId(userId),
-        filter_id: new mongoose.Types.ObjectId(filterId),
-      },
-      {
-        $set: { enabled },
-        $setOnInsert: {
-          organization_id: new mongoose.Types.ObjectId(organizationId),
-        },
-      },
-      { new: true, upsert: true },
-    )
-      .lean<UserFilterSettingDoc>()
-      .exec();
-    return toUserFilterSetting(doc as UserFilterSettingDoc);
-  }
-
-  async listUserFilterSettings(userId: string): Promise<UserFilterSetting[]> {
-    await this.connect();
-    const docs = await UserFilterSettingModel.find({ user_id: userId })
-      .lean<UserFilterSettingDoc[]>()
-      .exec();
-    return docs.map(toUserFilterSetting);
-  }
-
   /* -- Admin actions (append-only audit log) -------------------------------- */
 
   async createAdminAction(input: NewAdminAction): Promise<AdminAction> {
@@ -2675,56 +1926,6 @@ export class MongoAdapter implements DatabaseAdapter {
       AdminActionModel.countDocuments().exec(),
     ]);
     return { actions: docs.map(toAdminAction), total };
-  }
-
-  /* -- Gmail scans ----------------------------------------------------------- */
-
-  async createGmailScan(input: NewGmailScan): Promise<GmailScan> {
-    await this.connect();
-    const parsed = newGmailScanSchema.parse(input);
-    const created = await GmailScanModel.create({
-      organization_id: new mongoose.Types.ObjectId(parsed.organizationId),
-      user_id: new mongoose.Types.ObjectId(parsed.userId),
-      range_from: parsed.rangeFrom,
-      range_to: parsed.rangeTo,
-      status: parsed.status,
-      error: parsed.error ?? null,
-      proposals: parsed.proposals,
-    });
-    return toGmailScan(created.toObject<GmailScanDoc>());
-  }
-
-  async getGmailScanById(id: string): Promise<GmailScan | null> {
-    await this.connect();
-    const doc = await GmailScanModel.findById(id).lean<GmailScanDoc>().exec();
-    return doc ? toGmailScan(doc) : null;
-  }
-
-  async listGmailScansForUser(userId: string): Promise<GmailScan[]> {
-    await this.connect();
-    const docs = await GmailScanModel.find({ user_id: userId })
-      .sort({ createdAt: -1 })
-      .lean<GmailScanDoc[]>()
-      .exec();
-    return docs.map(toGmailScan);
-  }
-
-  async updateGmailScan(
-    id: string,
-    patch: UpdateGmailScan,
-  ): Promise<GmailScan> {
-    await this.connect();
-    const update: Record<string, unknown> = {};
-    if (patch.status !== undefined) update.status = patch.status;
-    if (patch.error !== undefined) update.error = patch.error ?? null;
-    if (patch.proposals !== undefined) update.proposals = patch.proposals;
-    const doc = await GmailScanModel.findByIdAndUpdate(id, update, {
-      new: true,
-    })
-      .lean<GmailScanDoc>()
-      .exec();
-    if (!doc) throw new Error(`mongo updateGmailScan: ${id} not found`);
-    return toGmailScan(doc);
   }
 
   /* -- Leads (scoped by organization_id) ----------------------------------- */

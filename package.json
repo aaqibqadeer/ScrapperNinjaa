@@ -1,7 +1,8 @@
 {
-  "name": "applyninjaa",
+  "name": "scrapperninja",
   "version": "0.1.0",
   "private": true,
+  "description": "ScrapperNinja — lead-gen SaaS with Chrome capture extension",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -16,9 +17,8 @@
     "seed:test": "tsx scripts/seed-test.ts",
     "sync:plans": "tsx scripts/sync-plans.ts",
     "hard-delete": "tsx scripts/hard-delete.ts",
-    "build:extension:apply": "PRODUCT=applyninja npm --prefix extension run build",
-    "build:extension:scrapper": "PRODUCT=scrapperninja npm --prefix extension run build",
-    "build:extension": "npm run build:extension:apply && npm run build:extension:scrapper"
+    "build:extension": "PRODUCT=scrapperninja npm --prefix extension run build",
+    "build:extension:scrapper": "npm run build:extension"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",
@@ -34,11 +34,9 @@
     "jose": "^6.2.3",
     "libphonenumber-js": "^1.13.10",
     "lucide-react": "^1.25.0",
-    "mammoth": "^1.12.0",
     "mongoose": "^9.7.4",
     "next": "15.5.20",
     "openai": "^6.48.0",
-    "pdf-parse": "^2.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sonner": "^1.7.4",

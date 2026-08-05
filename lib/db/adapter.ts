@@ -16,29 +16,22 @@
 
 import type {
   AdminAction,
-  Application,
-  ApplicationStatus,
   AppSettings,
   BatchJob,
   Campaign,
   CaptureSession,
   DuplicateCandidate,
-  GmailScan,
   Invitation,
   InvitationStatus,
-  JobFilter,
   Lead,
   LeadCustomField,
   LeadSource,
   NewAdminAction,
-  NewApplication,
   NewBatchJob,
   NewCampaign,
   NewCaptureSession,
   NewDuplicateCandidate,
-  NewGmailScan,
   NewInvitation,
-  NewJobFilter,
   NewLead,
   NewLeadCustomField,
   NewLeadSource,
@@ -46,7 +39,6 @@ import type {
   NewOrganization,
   NewOrganizationMember,
   NewPlan,
-  NewProfile,
   NewSavedView,
   NewSourcePack,
   NewSubscription,
@@ -56,31 +48,24 @@ import type {
   OrganizationMember,
   OrgRole,
   Plan,
-  Profile,
-  ProfileDomainPref,
   SavedView,
   SourcePack,
   Subscription,
-  UpdateApplication,
   UpdateAppSettings,
   UpdateBatchJob,
   UpdateCampaign,
   UpdateCaptureSession,
   UpdateDuplicateCandidate,
-  UpdateGmailScan,
-  UpdateJobFilter,
   UpdateLead,
   UpdateLeadCustomField,
   UpdateOfferPrompt,
   UpdateOrganization,
   UpdatePlan,
-  UpdateProfile,
   UpdateSavedView,
   UpdateSourcePack,
   UpdateSubscription,
   UpdateUser,
   User,
-  UserFilterSetting,
 } from "./schema";
 
 /** Paged user listing for the admin dashboard. */
@@ -215,71 +200,11 @@ export interface DatabaseAdapter {
   /** Batched variant for admin joins across many orgs. */
   listSubscriptionsForOrgs(organizationIds: string[]): Promise<Subscription[]>;
 
-  /* -- Profiles (tenant-scoped; multiple per user) ------------------------- */
-  createProfile(input: NewProfile): Promise<Profile>;
-  getProfileById(id: string): Promise<Profile | null>;
-  listProfilesForUser(userId: string): Promise<Profile[]>;
-  updateProfile(id: string, patch: UpdateProfile): Promise<Profile>;
-  deleteProfile(id: string): Promise<void>;
-
-  /* -- Profile domain prefs (last-used profile per job-site domain) -------- */
-  setProfileDomainPref(
-    organizationId: string,
-    userId: string,
-    domain: string,
-    profileId: string,
-  ): Promise<ProfileDomainPref>;
-  getProfileDomainPref(
-    userId: string,
-    domain: string,
-  ): Promise<ProfileDomainPref | null>;
-
-  /* -- Applications (tenant-scoped) ---------------------------------------- */
-  createApplication(input: NewApplication): Promise<Application>;
-  getApplicationById(id: string): Promise<Application | null>;
-  /** All of a user's applications, newest appliedAt first. */
-  listApplicationsForUser(userId: string): Promise<Application[]>;
-  updateApplication(id: string, patch: UpdateApplication): Promise<Application>;
-  deleteApplication(id: string): Promise<void>;
-  /** Bulk delete, scoped to the owning user; returns the deleted count. */
-  deleteApplicationsForUser(userId: string, ids: string[]): Promise<number>;
-  /** Bulk status change, scoped to the owning user; returns the count. */
-  updateApplicationsStatusForUser(
-    userId: string,
-    ids: string[],
-    status: ApplicationStatus,
-  ): Promise<number>;
-
-  /* -- Job filters (admin master list + per-user custom) ------------------- */
-  createJobFilter(input: NewJobFilter): Promise<JobFilter>;
-  getJobFilterById(id: string): Promise<JobFilter | null>;
-  /** The admin-managed master list (both active and inactive, admin view). */
-  listAdminJobFilters(): Promise<JobFilter[]>;
-  /** Active admin defaults + this user's own custom filters. */
-  listJobFiltersForUser(userId: string): Promise<JobFilter[]>;
-  updateJobFilter(id: string, patch: UpdateJobFilter): Promise<JobFilter>;
-  deleteJobFilter(id: string): Promise<void>;
-
-  /* -- User filter settings (per-user enable/disable toggles) -------------- */
-  setUserFilterEnabled(
-    organizationId: string,
-    userId: string,
-    filterId: string,
-    enabled: boolean,
-  ): Promise<UserFilterSetting>;
-  listUserFilterSettings(userId: string): Promise<UserFilterSetting[]>;
-
   /* -- Admin actions (append-only audit log) ------------------------------- */
   createAdminAction(input: NewAdminAction): Promise<AdminAction>;
   listAdminActions(
     params?: ListAdminActionsParams,
   ): Promise<ListAdminActionsResult>;
-
-  /* -- Gmail scans (manual, user-approved) --------------------------------- */
-  createGmailScan(input: NewGmailScan): Promise<GmailScan>;
-  getGmailScanById(id: string): Promise<GmailScan | null>;
-  listGmailScansForUser(userId: string): Promise<GmailScan[]>;
-  updateGmailScan(id: string, patch: UpdateGmailScan): Promise<GmailScan>;
 
   /* -- Leads (tenant-scoped by organizationId) ---------------------------- */
   /**

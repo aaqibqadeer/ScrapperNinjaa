@@ -23,7 +23,6 @@ import { auth } from "@/lib/auth";
 import {
   db,
   INVITATION_STATUSES,
-  JOB_FILTER_TYPES,
   ORG_ROLES,
   PLAN_SLUGS,
   type BusinessSize,
@@ -1111,53 +1110,6 @@ export async function runSeed(): Promise<void> {
     }
   }
 
-  // Admin-default "Valid Job" filters (product spec §4). Idempotent by label.
-  const defaultFilters = [
-    {
-      label: "Visa Sponsorship Available",
-      description:
-        "Yes when the posting says it sponsors visas (H1-B or similar). No when it says it cannot sponsor. Neutral when sponsorship is never mentioned — most postings say nothing, and silence is not a refusal.",
-    },
-    {
-      label: "US Citizenship Required",
-      description:
-        "Yes when the posting requires US citizenship. No when it explicitly says citizenship is not required. Neutral when it isn't mentioned. (Yes here is a restriction, not a positive.)",
-    },
-    {
-      label: "Security Clearance Required",
-      description:
-        "Yes when the posting requires an active or obtainable clearance. No when it explicitly says none is needed. Neutral when it isn't mentioned. (Yes here is a restriction, not a positive.)",
-    },
-    {
-      label: "Work Authorization Match",
-      description:
-        "Compares the posting against the candidate's stated work authorization. Yes when they're compatible, No when the posting's requirement rules the candidate out, Neutral when the posting states no requirement.",
-    },
-    {
-      label: "Remote/Hybrid/Onsite Match",
-      description:
-        "Compares the posting against the candidate's preferred arrangement. Yes when they match, No when the posting conflicts (e.g. fully onsite for a remote-only candidate), Neutral when the posting doesn't state where the work happens.",
-    },
-    {
-      label: "Salary Range Disclosed",
-      description:
-        "Yes when the posting states a salary or compensation range. No is not really applicable here — a posting that omits pay is Neutral, not No.",
-    },
-  ];
-  const existingAdminFilters = await db.listAdminJobFilters();
-  const existingLabels = new Set(existingAdminFilters.map((f) => f.label));
-  for (const filter of defaultFilters) {
-    if (!existingLabels.has(filter.label)) {
-      await db.createJobFilter({
-        label: filter.label,
-        description: filter.description,
-        type: JOB_FILTER_TYPES.admin,
-        ownerId: null,
-        isActive: true,
-      });
-    }
-  }
-
   // Ensure the platform settings singleton exists. `trialDays` (default 7) is
   // the length of the local no-card trial started at email verification;
   // the legacy Stripe-checkout trial is disabled in lib/payments/checkout.ts.
@@ -1203,8 +1155,6 @@ export async function runSeed(): Promise<void> {
   console.log(
     `  plans         ${plans.map((p) => `${p.name} (${p.slug})`).join(", ") || "none"}`,
   );
-  const filters = await db.listAdminJobFilters();
-  console.log(`  job filters   ${filters.length} admin defaults`);
   console.log(
     `  app settings  trialDays=${settings.trialDays}, leadScoringRubric ${
       settings.leadScoringRubric ? "set" : "unset"

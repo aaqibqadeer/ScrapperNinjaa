@@ -48,8 +48,7 @@ const baseSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().min(1).default("http://localhost:3000"),
   /**
    * Which product this deployment is (identity: name, marketing copy, legal).
-   * Always required — independent of feature flags. Valid: applyninja |
-   * scrapperninja. Absence must fail boot; never default silently.
+   * Always required — independent of feature flags. Valid: scrapperninja.
    */
   NEXT_PUBLIC_PRODUCT: z.enum(PRODUCT_IDS),
   // From-address for transactional auth emails (magic link / reset) sent via
@@ -72,9 +71,8 @@ const baseSchema = z.object({
   LINKEDIN_CLIENT_ID: optionalString,
   LINKEDIN_CLIENT_SECRET: optionalString,
 
-  // Field-level encryption key for sensitive profile data (EEO fields) and
-  // stored Gmail refresh tokens — base64-encoded 32 bytes
-  // (`openssl rand -base64 32`). Losing it makes that data unrecoverable.
+  // Field-level encryption key for sensitive data at rest — base64-encoded 32 bytes
+  // (`openssl rand -base64 32`). Losing it makes encrypted data unrecoverable.
   EEO_ENCRYPTION_KEY: optionalString,
 
   // Email (used by magic-link delivery)
@@ -182,26 +180,11 @@ function requirementRules(value: BaseEnv): RequirementRule[] {
       reason: "auth.magicLink is on (email delivery)",
     },
 
-    // Field-level encryption — required whenever any auth method is on, since
-    // signed-in users can store encrypted EEO profile data.
+    // Field-level encryption — required whenever any auth method is on.
     {
       when: isAnyAuthEnabled,
       key: "EEO_ENCRYPTION_KEY",
-      reason: "an auth method is enabled (encrypted profile fields)",
-    },
-
-    // Gmail integration reuses the Google OAuth client for its own read-only
-    // consent flow — the client credentials are required even if Google login
-    // itself is off.
-    {
-      when: features.gmail,
-      key: "GOOGLE_CLIENT_ID",
-      reason: "gmail is on",
-    },
-    {
-      when: features.gmail,
-      key: "GOOGLE_CLIENT_SECRET",
-      reason: "gmail is on",
+      reason: "an auth method is enabled (field-level encryption)",
     },
 
     // Payments (annualBilling is a UI/data cadence flag — unlocks no new secret)

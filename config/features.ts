@@ -66,12 +66,6 @@ export interface Features {
   auth: AuthFeatureFlags;
   /** Subscription / one-off billing (Stripe). */
   payments: PaymentsFeatureFlags;
-  /**
-   * Job-application product surface (ApplyNinjaa): profiles, onboarding,
-   * applications tracker, Gmail scans, job filters, and the resume/field-map AI
-   * tasks. Off in ScrapperNinja forks — those routes 404 and their nav hides.
-   */
-  jobApplications: boolean;
   /** Lead-scraping product surface (ScrapperNinja). */
   scraper: ScraperFeatureFlags;
   /** File storage. */
@@ -82,11 +76,6 @@ export interface Features {
   admin: boolean;
   /** Cookie-consent banner (accept/reject, choice stored in a cookie). */
   cookieBanner: boolean;
-  /**
-   * Gmail integration — separate opt-in read-only Gmail OAuth + manual inbox
-   * scans that propose application-status updates. Independent of login OAuth.
-   */
-  gmail: boolean;
   /** Enabled AI providers; empty array means AI is off. */
   aiProviders: AiProvider[];
   /**
@@ -122,7 +111,6 @@ export const features: Features = {
     enabled: !!process.env.NEXT_PUBLIC_FEATURE_PAYMENTS,
     annualBilling: !!process.env.NEXT_PUBLIC_FEATURE_PAYMENTS_ANNUAL_BILLING,
   },
-  jobApplications: !!process.env.NEXT_PUBLIC_FEATURE_JOB_APPLICATIONS,
   scraper: {
     enabled: !!process.env.NEXT_PUBLIC_FEATURE_SCRAPER,
     enrichment: !!process.env.NEXT_PUBLIC_FEATURE_SCRAPER_ENRICHMENT,
@@ -133,7 +121,6 @@ export const features: Features = {
   phoneVerification: !!process.env.NEXT_PUBLIC_FEATURE_PHONE_VERIFICATION,
   admin: !!process.env.NEXT_PUBLIC_FEATURE_ADMIN,
   cookieBanner: !!process.env.NEXT_PUBLIC_FEATURE_COOKIE_BANNER,
-  gmail: !!process.env.NEXT_PUBLIC_FEATURE_GMAIL,
   aiProviders: resolveAiProviders(),
   multiTenant: !!process.env.NEXT_PUBLIC_FEATURE_MULTI_TENANT,
 };

@@ -1,16 +1,15 @@
 /**
- * config/products.ts — product identity registry (two-product production plan §P0).
+ * config/products.ts — ScrapperNinja product identity.
  *
- * NEXT_PUBLIC_PRODUCT selects which product this deployment is. Identity
- * (name, copy, legal) is independent of capability flags in features.ts on
- * purpose: a staging service can run ScrapperNinja's identity with enrichment
- * off.
+ * NEXT_PUBLIC_PRODUCT must be `scrapperninja`. Identity (name, copy, legal) is
+ * independent of capability flags in features.ts on purpose: a staging service
+ * can run ScrapperNinja's identity with enrichment off.
  *
  * Unknown or absent values throw at module load — a silent wrong default would
  * ship the wrong brand to customers.
  */
 
-export const PRODUCT_IDS = ["applyninja", "scrapperninja"] as const;
+export const PRODUCT_IDS = ["scrapperninja"] as const;
 export type ProductId = (typeof PRODUCT_IDS)[number];
 
 export interface ProductMarketing {
@@ -41,84 +40,6 @@ export interface ProductDefinition {
 }
 
 export const PRODUCTS: Record<ProductId, ProductDefinition> = {
-  applyninja: {
-    id: "applyninja",
-    name: "ApplyNinjaa",
-    description:
-      "Autofill job applications, screen listings against your deal-breakers, " +
-      "score job fit against your resume, and track every application.",
-    tagline: "Apply smarter, not slower.",
-    supportEmail: "support@applyninjaa.com",
-    marketing: {
-      hero: {
-        badge: "Built for visa-constrained job seekers",
-        headline: "Stop applying to jobs that were never going to say yes.",
-        sub:
-          "screens every posting against your deal-breakers — visa " +
-          "sponsorship, citizenship requirements, clearance — scores your fit " +
-          "against your resume, autofills the application, and tracks it. One " +
-          "click, any job site.",
-        cta: "Start free — no card required",
-        secondaryCta: "See how it works",
-        screenshotLabel:
-          "[ Product screenshot — extension popup analyzing a job posting ]",
-        audience: [
-          "F-1 OPT / STEM OPT",
-          "H1-B",
-          "TN",
-          "H4-EAD",
-          "…and every job seeker tired of re-typing their resume",
-        ],
-      },
-      howItWorks: [
-        {
-          title: "Upload your resume once",
-          body: "We parse it into a structured profile — every field editable, nothing re-typed again. The file itself is discarded after parsing.",
-        },
-        {
-          title: "Open any job posting",
-          body: "Click the extension icon. Every deal-breaker filter you set gets a Yes / No / Neutral badge, plus a 0-100 fit score with reasoning.",
-        },
-        {
-          title: "Autofill & apply",
-          body: "One click fills the application from your profile. Anything the AI isn't sure about is flagged for your review — never silently skipped.",
-        },
-        {
-          title: "Track everything",
-          body: "Hit Track and the job lands in your dashboard. Optionally scan your Gmail to catch interview invites and rejections automatically.",
-        },
-      ],
-      testimonialsHeading: "What job seekers say",
-      testimonials: [
-        {
-          quote:
-            "[Placeholder] Stopped wasting evenings on postings that don't sponsor. The filter badges pay for themselves.",
-          who: "A. Kumar",
-          role: "SWE, F-1 STEM OPT",
-        },
-        {
-          quote:
-            "[Placeholder] Applied to 40 jobs in a weekend. The autofill catches fields I'd have mistyped.",
-          who: "M. Chen",
-          role: "Data Analyst",
-        },
-        {
-          quote:
-            "[Placeholder] The Gmail scan found two interview invites buried in promotions. Worth it for that alone.",
-          who: "S. Alvarez",
-          role: "Product Designer",
-        },
-      ],
-      pricing: {
-        title: "Simple pricing",
-        sub: "Every new account starts with a free trial — no card required.",
-      },
-    },
-    pricingBullets: [
-      "Unlimited tracked applications",
-      "All Valid Job filters",
-    ],
-  },
   scrapperninja: {
     id: "scrapperninja",
     name: "ScrapperNinja",
@@ -191,10 +112,7 @@ export const PRODUCTS: Record<ProductId, ProductDefinition> = {
         sub: "Every new account starts with a free trial — no card required.",
       },
     },
-    pricingBullets: [
-      "Shared Lead Directory",
-      "CSV import and export",
-    ],
+    pricingBullets: ["Shared Lead Directory", "CSV import and export"],
   },
 };
 

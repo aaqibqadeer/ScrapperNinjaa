@@ -3,16 +3,14 @@
  * soft-delete window has passed (`npm run hard-delete`, run on a schedule —
  * e.g. daily cron).
  *
- * Deletes: profiles (incl. encrypted EEO), domain prefs, applications,
- * custom filters + toggle settings, Gmail scans + encrypted tokens, auth
- * credentials, the default org + membership + subscription rows, and the
- * user record itself. Anonymized usage counters/logs are retained — after
- * the user row is gone their ObjectId no longer identifies anyone (product
+ * Deletes: auth credentials, the default org + membership + subscription rows,
+ * and the user record itself. Anonymized usage counters/logs are retained —
+ * after the user row is gone their ObjectId no longer identifies anyone (product
  * spec §12).
  *
  * Uses adapter methods where they exist; operational collections owned by
- * Mongo-only modules (credentials, tokens, settings, prefs) are purged
- * directly by collection name — this is a maintenance script, not app code.
+ * Mongo-only modules (credentials, tokens, settings) are purged directly by
+ * collection name — this is a maintenance script, not app code.
  */
 
 import mongoose from "mongoose";
@@ -20,7 +18,6 @@ import mongoose from "mongoose";
 import "./load-env";
 import { db, USER_STATUSES } from "@/lib/db";
 import { connectMongo } from "@/lib/db/mongodb/adapter";
-import { deleteGmailConnection } from "@/lib/gmail/store";
 
 const WINDOW_DAYS = 30;
 
@@ -33,31 +30,6 @@ async function purgeCollection(
 
 async function hardDeleteUser(userId: string): Promise<void> {
   const uid = new mongoose.Types.ObjectId(userId);
-
-  // Profiles (incl. EEO ciphertext) + per-domain prefs.
-  const profiles = await db.listProfilesForUser(userId);
-  for (const profile of profiles) await db.deleteProfile(profile.id);
-  await purgeCollection("profile_domain_prefs", { user_id: uid });
-
-  // Tracked applications.
-  const applications = await db.listApplicationsForUser(userId);
-  await db.deleteApplicationsForUser(
-    userId,
-    applications.map((a) => a.id),
-  );
-
-  // Custom filters (cascades their settings) + remaining toggle settings.
-  const filters = await db.listJobFiltersForUser(userId);
-  for (const filter of filters) {
-    if (filter.type === "user" && filter.ownerId === userId) {
-      await db.deleteJobFilter(filter.id);
-    }
-  }
-  await purgeCollection("user_filter_settings", { user_id: uid });
-
-  // Gmail: encrypted refresh token + scan history.
-  await deleteGmailConnection(userId);
-  await purgeCollection("gmail_scans", { user_id: uid });
 
   // Auth credential (bcrypt hash).
   await purgeCollection("auth_credentials", { user_id: uid });
