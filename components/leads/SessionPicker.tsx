@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Select } from "@/components/ui/select";
 import { formatDateTime } from "@/lib/format/datetime";
 import type { CaptureSession } from "@/lib/db/schema";
+import { cachedJsonFetch, peekFetchCache } from "@/lib/client/fetch-cache";
 import { cn } from "@/lib/utils";
 
 export interface SessionOption {
@@ -42,24 +43,42 @@ export function SessionPicker({
 
   useEffect(() => {
     let cancelled = false;
+    const sessionsUrl = "/api/capture-sessions";
+    const campaignsUrl = "/api/campaigns";
+    const cachedSessions = peekFetchCache<{ sessions?: CaptureSession[] }>(
+      sessionsUrl,
+    );
+    const cachedCampaigns = peekFetchCache<{
+      campaigns?: { id: string; name: string }[];
+    }>(campaignsUrl);
+    if (cachedSessions) setSessions(cachedSessions.sessions ?? []);
+    if (cachedCampaigns) {
+      setCampaignNames(
+        new Map((cachedCampaigns.campaigns ?? []).map((c) => [c.id, c.name])),
+      );
+    }
+    if (cachedSessions && cachedCampaigns) return;
+
     void (async () => {
       const [sessionsRes, campaignsRes] = await Promise.all([
-        fetch("/api/capture-sessions"),
-        fetch("/api/campaigns").catch(() => null),
+        cachedSessions
+          ? Promise.resolve(null)
+          : cachedJsonFetch<{ sessions?: CaptureSession[] }>(sessionsUrl),
+        cachedCampaigns
+          ? Promise.resolve(null)
+          : cachedJsonFetch<{ campaigns?: { id: string; name: string }[] }>(
+              campaignsUrl,
+            ).catch(() => null),
       ]);
       if (cancelled) return;
-      if (sessionsRes.ok) {
-        const data = (await sessionsRes.json()) as {
-          sessions?: CaptureSession[];
-        };
-        setSessions(data.sessions ?? []);
+      if (sessionsRes?.ok) {
+        setSessions(sessionsRes.data.sessions ?? []);
       }
       if (campaignsRes?.ok) {
-        const data = (await campaignsRes.json()) as {
-          campaigns?: { id: string; name: string }[];
-        };
         setCampaignNames(
-          new Map((data.campaigns ?? []).map((c) => [c.id, c.name])),
+          new Map(
+            (campaignsRes.data.campaigns ?? []).map((c) => [c.id, c.name]),
+          ),
         );
       }
     })();

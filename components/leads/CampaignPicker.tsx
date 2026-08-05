@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import type { Campaign } from "@/lib/db/schema";
+import { invalidateFetchCache } from "@/lib/client/fetch-cache";
 import { cn } from "@/lib/utils";
 
 export interface CampaignOption {
@@ -82,6 +83,7 @@ export function CampaignPicker({
       }
       onCreated(data.campaign);
       onChange(data.campaign.id);
+      invalidateFetchCache("/api/campaigns");
       toast.success(`Created campaign "${data.campaign.name}"`);
       setName("");
       setOpen(false);

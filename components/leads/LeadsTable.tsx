@@ -5,10 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Briefcase,
+  Columns3,
+  Download,
   Filter,
+  Megaphone,
   MoreHorizontal,
   Pencil,
   Plus,
+  Settings2,
   Sparkles,
   Upload,
 } from "lucide-react";
@@ -41,6 +45,8 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Pagination } from "@/components/shared/Pagination";
 import { SavedViewsMenu } from "@/components/shared/SavedViewsMenu";
 import { SortableHeader } from "@/components/shared/SortableHeader";
+import { TableLoadingOverlay } from "@/components/shared/TableLoadingOverlay";
+import { TableLoadingSkeleton } from "@/components/shared/TableLoadingSkeleton";
 import { InlineEditCell } from "@/components/shared/InlineEditCell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,7 +72,6 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -81,8 +86,11 @@ import {
   type ColumnType,
 } from "@/lib/leads/columns";
 import {
+  BUSINESS_SIZES,
   CUSTOM_FIELD_TYPES,
+  ENRICHMENT_STATUSES,
   LEAD_STATUSES,
+  WEBSITE_STATUSES,
   type Campaign,
   type CustomFieldType,
   type Lead,
@@ -93,6 +101,11 @@ import {
   type SavedViewPageSize,
   type SavedViewQuery,
 } from "@/lib/db/schema";
+import {
+  cachedJsonFetch,
+  invalidateFetchCache,
+  peekFetchCache,
+} from "@/lib/client/fetch-cache";
 import { formatDateTime } from "@/lib/format/datetime";
 import { cn } from "@/lib/utils";
 
@@ -114,16 +127,80 @@ interface TableColumn {
   isCustom: boolean;
 }
 
-const EDITABLE_TEXT_KEYS = new Set([
-  "businessName",
-  "phone",
-  "website",
-  "ownerName",
-  "offerLine",
-  "notes",
-]);
+/** Address sub-fields edited via a merged `address` patch. */
+const ADDRESS_EDIT_KEYS = new Set(["city", "state"]);
 
 const PAGE_SIZE_OPTIONS: SavedViewPageSize[] = [25, 50, 100, 250];
+
+/** Deep-merge address / customFields so staged edits don't clobber siblings. */
+function applyLeadPatch(lead: Lead, patch: Record<string, unknown>): Lead {
+  let next: Lead = { ...lead };
+  if (patch.address && typeof patch.address === "object") {
+    next = {
+      ...next,
+      address: {
+        ...(next.address ?? {}),
+        ...(patch.address as LeadAddress),
+      },
+    };
+  }
+  if (patch.customFields && typeof patch.customFields === "object") {
+    next = {
+      ...next,
+      customFields: {
+        ...(next.customFields ?? {}),
+        ...(patch.customFields as Record<string, unknown>),
+      },
+    };
+  }
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === "address" || key === "customFields") continue;
+    next = { ...next, [key]: value } as Lead;
+  }
+  return next;
+}
+
+/** Merge a new cell patch into the staged dirty blob for one lead. */
+function mergeDirtyPatch(
+  existing: Record<string, unknown> | undefined,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...(existing ?? {}) };
+  if (patch.address && typeof patch.address === "object") {
+    next.address = {
+      ...((next.address as LeadAddress | undefined) ?? {}),
+      ...(patch.address as LeadAddress),
+    };
+  }
+  if (patch.customFields && typeof patch.customFields === "object") {
+    next.customFields = {
+      ...((next.customFields as Record<string, unknown> | undefined) ?? {}),
+      ...(patch.customFields as Record<string, unknown>),
+    };
+  }
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === "address" || key === "customFields") continue;
+    next[key] = value;
+  }
+  return next;
+}
+
+/** Parse a comma/semicolon-separated email list for the emails column. */
+function parseEmailsInput(raw: string): string[] {
+  return raw
+    .split(/[,;\s]+/)
+    .map((e) => e.trim())
+    .filter((e) => e.length > 0)
+    .slice(0, 50);
+}
+
+/** Parse a nullable number from an inline-edit string. */
+function parseNullableNumber(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : null;
+}
 
 /** A single column's filter directives sent as `f.<col>...` params. */
 interface FilterSpec {
@@ -190,7 +267,7 @@ function buildColumns(customFields: LeadCustomField[]): TableColumn[] {
       filterType: type,
       sortable: true,
       filterable: true,
-      editable: false,
+      editable: true,
       enumValues: field.type === "select" ? [...field.options] : [],
       isCustom: true,
     };
@@ -332,7 +409,7 @@ export function LeadsTable({
 
   const [leads, setLeads] = useState<Lead[] | null>(null);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [needsReviewCount, setNeedsReviewCount] = useState(0);
   const [rescuing, setRescuing] = useState(false);
 
@@ -408,6 +485,7 @@ export function LeadsTable({
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
+  const [columnsOpen, setColumnsOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
   /** Delay row→drawer so a double-click can win for inline edit. */
   const detailClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -527,7 +605,11 @@ export function LeadsTable({
     [allMatching, selectionQuery, selected],
   );
 
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  const reload = useCallback(() => {
+    invalidateFetchCache("/api/leads");
+    invalidateFetchCache("/api/duplicates");
+    setNonce((n) => n + 1);
+  }, []);
 
   // Persist the live view to the URL (replace, not push — no history spam) so a
   // refresh or back-button restores it. Unknown params are preserved; only the
@@ -578,16 +660,26 @@ export function LeadsTable({
 
   useEffect(() => {
     let cancelled = false;
+    const url = `/api/leads?${buildParams(true).toString()}`;
+    const cached = peekFetchCache<{ leads: Lead[]; total: number }>(url);
+    if (cached) {
+      setLeads(cached.leads);
+      setTotal(cached.total);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     void (async () => {
-      const res = await fetch(`/api/leads?${buildParams(true).toString()}`);
+      const result = await cachedJsonFetch<{ leads: Lead[]; total: number }>(
+        url,
+      );
       if (cancelled) return;
-      if (res.ok) {
-        const data = (await res.json()) as { leads: Lead[]; total: number };
-        setLeads(data.leads);
-        setTotal(data.total);
+      if (result.ok) {
+        setLeads(result.data.leads);
+        setTotal(result.data.total);
       } else {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = result.data as { error?: string };
         setLeads([]);
         setTotal(0);
         toast.error(data.error ?? "Could not load leads");
@@ -603,13 +695,16 @@ export function LeadsTable({
   // filters, so the chip badge + Rescue button reflect the whole org.
   useEffect(() => {
     let cancelled = false;
+    const url = "/api/leads?status=needs_review&pageSize=25";
+    const cached = peekFetchCache<{ total?: number }>(url);
+    if (cached) {
+      setNeedsReviewCount(cached.total ?? 0);
+      return;
+    }
     void (async () => {
-      // `total` is what we need; pageSize is the smallest the schema allows
-      // (25/50/100/250) — the count is independent of the page window.
-      const res = await fetch("/api/leads?status=needs_review&pageSize=25");
-      if (cancelled || !res.ok) return;
-      const data = (await res.json().catch(() => ({}))) as { total?: number };
-      setNeedsReviewCount(data.total ?? 0);
+      const result = await cachedJsonFetch<{ total?: number }>(url);
+      if (cancelled || !result.ok) return;
+      setNeedsReviewCount(result.data.total ?? 0);
     })();
     return () => {
       cancelled = true;
@@ -620,15 +715,18 @@ export function LeadsTable({
   // null (chip hidden) when the duplicates API isn't available yet (404).
   useEffect(() => {
     let cancelled = false;
+    const url = "/api/duplicates?status=pending";
+    const cached = peekFetchCache<{ candidates?: unknown[] }>(url);
+    if (cached) {
+      setDuplicatesCount(cached.candidates?.length ?? 0);
+      return;
+    }
     void (async () => {
-      const res = await fetch("/api/duplicates?status=pending").catch(
-        () => null,
-      );
-      if (cancelled || !res || !res.ok) return;
-      const data = (await res.json().catch(() => ({}))) as {
-        candidates?: unknown[];
-      };
-      setDuplicatesCount(data.candidates?.length ?? 0);
+      const result = await cachedJsonFetch<{ candidates?: unknown[] }>(
+        url,
+      ).catch(() => null);
+      if (cancelled || !result || !result.ok) return;
+      setDuplicatesCount(result.data.candidates?.length ?? 0);
     })();
     return () => {
       cancelled = true;
@@ -637,23 +735,41 @@ export function LeadsTable({
 
   useEffect(() => {
     void (async () => {
+      const campaignsCached = peekFetchCache<{ campaigns: Campaign[] }>(
+        "/api/campaigns",
+      );
+      const viewsCached = peekFetchCache<{ views: SavedViewRecord[] }>(
+        "/api/views",
+      );
+      const fieldsCached = peekFetchCache<{ fields: LeadCustomField[] }>(
+        "/api/custom-fields",
+      );
+
+      if (campaignsCached) setCampaigns(campaignsCached.campaigns);
+      if (fieldsCached) setCustomFields(fieldsCached.fields);
+      if (viewsCached) {
+        setViews(viewsCached.views);
+        const def = viewsCached.views.find((v) => v.isDefault);
+        if (def && !hasUrlFilters(init)) applyView(def);
+      }
+
       const [campaignsRes, viewsRes, fieldsRes] = await Promise.all([
-        fetch("/api/campaigns"),
-        fetch("/api/views"),
-        fetch("/api/custom-fields"),
+        campaignsCached
+          ? Promise.resolve(null)
+          : cachedJsonFetch<{ campaigns: Campaign[] }>("/api/campaigns"),
+        viewsCached
+          ? Promise.resolve(null)
+          : cachedJsonFetch<{ views: SavedViewRecord[] }>("/api/views"),
+        fieldsCached
+          ? Promise.resolve(null)
+          : cachedJsonFetch<{ fields: LeadCustomField[] }>("/api/custom-fields"),
       ]);
-      if (campaignsRes.ok) {
-        const data = (await campaignsRes.json()) as { campaigns: Campaign[] };
-        setCampaigns(data.campaigns);
-      }
-      if (fieldsRes.ok) {
-        const data = (await fieldsRes.json()) as { fields: LeadCustomField[] };
-        setCustomFields(data.fields);
-      }
-      if (viewsRes.ok) {
-        const data = (await viewsRes.json()) as { views: SavedViewRecord[] };
-        setViews(data.views);
-        const def = data.views.find((v) => v.isDefault);
+
+      if (campaignsRes?.ok) setCampaigns(campaignsRes.data.campaigns);
+      if (fieldsRes?.ok) setCustomFields(fieldsRes.data.fields);
+      if (viewsRes?.ok) {
+        setViews(viewsRes.data.views);
+        const def = viewsRes.data.views.find((v) => v.isDefault);
         if (def && !hasUrlFilters(init)) applyView(def);
       }
     })();
@@ -727,7 +843,7 @@ export function LeadsTable({
     setLeads(
       (prev) =>
         prev?.map((lead) =>
-          lead.id === id ? ({ ...lead, ...patch } as Lead) : lead,
+          lead.id === id ? applyLeadPatch(lead, patch) : lead,
         ) ?? null,
     );
     const res = await fetch(`/api/leads/${id}`, {
@@ -751,10 +867,13 @@ export function LeadsTable({
     setLeads(
       (prev) =>
         prev?.map((lead) =>
-          lead.id === id ? ({ ...lead, ...patch } as Lead) : lead,
+          lead.id === id ? applyLeadPatch(lead, patch) : lead,
         ) ?? null,
     );
-    setDirty((prev) => ({ ...prev, [id]: { ...(prev[id] ?? {}), ...patch } }));
+    setDirty((prev) => ({
+      ...prev,
+      [id]: mergeDirtyPatch(prev[id], patch),
+    }));
   }
 
   /** Persist every staged row with a sequential PATCH; keep failures dirty. */
@@ -962,6 +1081,7 @@ export function LeadsTable({
         toast.error(data.error ?? "Could not create the custom field");
         return;
       }
+      invalidateFetchCache("/api/custom-fields");
       setCustomFields((prev) => [...prev, data.field!]);
       setNewCf({ key: "", label: "", type: "text", options: "" });
       setAddCfOpen(false);
@@ -985,14 +1105,12 @@ export function LeadsTable({
       error?: string;
     };
     if (!res.ok) throw new Error(data.error ?? "Import failed");
-    // Import may have auto-created custom fields — refresh so their columns
-    // appear in the picker and render on rows.
-    const fieldsRes = await fetch("/api/custom-fields").catch(() => null);
-    if (fieldsRes?.ok) {
-      const fieldsData = (await fieldsRes.json().catch(() => ({}))) as {
-        fields?: LeadCustomField[];
-      };
-      if (fieldsData.fields) setCustomFields(fieldsData.fields);
+    invalidateFetchCache("/api/custom-fields");
+    const fieldsRes = await cachedJsonFetch<{ fields?: LeadCustomField[] }>(
+      "/api/custom-fields",
+    ).catch(() => null);
+    if (fieldsRes?.ok && fieldsRes.data.fields) {
+      setCustomFields(fieldsRes.data.fields);
     }
     reload();
     return { imported: data.created ?? 0, errors: data.skipped ?? 0 };
@@ -1081,6 +1199,7 @@ export function LeadsTable({
       toast.error(data.error ?? "Could not save the view");
       return;
     }
+    invalidateFetchCache("/api/views");
     setViews((prev) => [...prev, data.view!]);
     setActiveViewId(data.view.id);
     toast.success(`Saved view "${data.view.name}"`);
@@ -1101,6 +1220,7 @@ export function LeadsTable({
       toast.error("Could not set the default view");
       return;
     }
+    invalidateFetchCache("/api/views");
     setViews((prev) => prev.map((v) => ({ ...v, isDefault: v.id === id })));
     toast.success("Default view set");
   }
@@ -1111,6 +1231,7 @@ export function LeadsTable({
       toast.error("Could not delete the view");
       return;
     }
+    invalidateFetchCache("/api/views");
     setViews((prev) => prev.filter((v) => v.id !== id));
     if (activeViewId === id) setActiveViewId(null);
     toast.success("View deleted");
@@ -1133,55 +1254,190 @@ export function LeadsTable({
   }
 
   function cellContent(lead: Lead, column: TableColumn) {
+    const key = column.key;
+
     if (column.isCustom) {
       const slug = customFieldSlug(column.key);
       const value = slug ? lead.customFields?.[slug] : undefined;
+      if (!column.editable || !slug) {
+        return (
+          <span className="block truncate text-sm">
+            {value == null ? (
+              <span className="text-muted-foreground">—</span>
+            ) : (
+              String(value)
+            )}
+          </span>
+        );
+      }
+      if (column.type === "enum") {
+        return (
+          <InlineEditCell
+            type="select"
+            value={value == null ? "" : String(value)}
+            alwaysEdit={editMode}
+            options={[
+              { value: "", label: "—" },
+              ...column.enumValues.map((s) => ({ value: s, label: s })),
+            ]}
+            onSave={(next) =>
+              editCell(lead.id, {
+                customFields: { [slug]: next || null },
+              })
+            }
+          />
+        );
+      }
+      return (
+        <InlineEditCell
+          value={value == null ? "" : String(value)}
+          alwaysEdit={editMode}
+          onSave={(next) => {
+            const parsed =
+              column.type === "number"
+                ? parseNullableNumber(next)
+                : column.type === "boolean"
+                  ? next === ""
+                    ? null
+                    : next === "true" || next === "1"
+                  : next || null;
+            editCell(lead.id, { customFields: { [slug]: parsed } });
+          }}
+        />
+      );
+    }
+
+    if (key === "parseIssues") {
       return (
         <span className="block truncate text-sm">
-          {value == null ? (
-            <span className="text-muted-foreground">—</span>
+          {lead.parseIssues.length > 0 ? (
+            lead.parseIssues.join("; ")
           ) : (
-            String(value)
+            <span className="text-muted-foreground">—</span>
           )}
         </span>
       );
     }
 
-    const key = column.key;
-
-    if (EDITABLE_TEXT_KEYS.has(key)) {
+    if (column.type === "date") {
       const raw = (lead as unknown as Record<string, unknown>)[key];
       return (
+        <span className="block truncate text-sm">{formatDateTime(raw)}</span>
+      );
+    }
+
+    if (column.editable && ADDRESS_EDIT_KEYS.has(key)) {
+      const current =
+        key === "city"
+          ? (lead.address?.city ?? "")
+          : (lead.address?.state ?? "");
+      return (
         <InlineEditCell
-          value={typeof raw === "string" ? raw : ""}
+          value={current}
           alwaysEdit={editMode}
+          onSave={(next) =>
+            editCell(lead.id, {
+              address: {
+                ...(lead.address ?? {}),
+                [key]: next || null,
+              },
+            })
+          }
+        />
+      );
+    }
+
+    if (column.editable && key === "emails") {
+      return (
+        <InlineEditCell
+          value={(lead.emails ?? []).join(", ")}
+          alwaysEdit={editMode}
+          placeholder="—"
+          onSave={(next) =>
+            editCell(lead.id, { emails: parseEmailsInput(next) })
+          }
+        />
+      );
+    }
+
+    if (column.editable && column.type === "enum") {
+      const raw = (lead as unknown as Record<string, unknown>)[key];
+      const options =
+        key === "status"
+          ? LEAD_STATUSES
+          : key === "websiteStatus"
+            ? WEBSITE_STATUSES
+            : key === "businessSize"
+              ? BUSINESS_SIZES
+              : key === "enrichmentStatus"
+                ? ENRICHMENT_STATUSES
+                : column.enumValues;
+      return (
+        <InlineEditCell
+          type="select"
+          value={raw == null ? "" : String(raw)}
+          alwaysEdit={editMode}
+          options={options.map((s) => ({ value: s, label: s }))}
           onSave={(next) => editCell(lead.id, { [key]: next || null })}
         />
       );
     }
 
-    if (key === "status") {
+    if (column.editable && column.type === "number") {
+      const raw = (lead as unknown as Record<string, unknown>)[key];
       return (
         <InlineEditCell
-          type="select"
-          value={lead.status}
+          value={raw == null ? "" : String(raw)}
           alwaysEdit={editMode}
-          options={LEAD_STATUSES.map((s) => ({ value: s, label: s }))}
-          onSave={(next) => editCell(lead.id, { status: next })}
+          onSave={(next) => {
+            const n = parseNullableNumber(next);
+            if (key === "reviewCount" && n != null) {
+              editCell(lead.id, { reviewCount: Math.max(0, Math.round(n)) });
+              return;
+            }
+            editCell(lead.id, { [key]: n });
+          }}
         />
       );
     }
 
-    if (key === "score") {
+    if (column.editable && column.type === "text") {
+      const raw = (lead as unknown as Record<string, unknown>)[key];
       return (
-        <span
-          className="block truncate text-sm"
-          title={lead.scoreReasoning ?? undefined}
-        >
-          {lead.score == null ? (
+        <InlineEditCell
+          value={typeof raw === "string" ? raw : raw == null ? "" : String(raw)}
+          alwaysEdit={editMode}
+          onSave={(next) => {
+            if (key === "businessName") {
+              const trimmed = next.trim();
+              if (!trimmed) return;
+              editCell(lead.id, { businessName: trimmed });
+              return;
+            }
+            if (key === "notes") {
+              editCell(lead.id, { notes: next });
+              return;
+            }
+            editCell(lead.id, { [key]: next || null });
+          }}
+        />
+      );
+    }
+
+    if (key === "city") {
+      return (
+        <span className="block truncate text-sm">
+          {lead.address?.city || (
             <span className="text-muted-foreground">—</span>
-          ) : (
-            lead.score
+          )}
+        </span>
+      );
+    }
+    if (key === "state") {
+      return (
+        <span className="block truncate text-sm">
+          {lead.address?.state || (
+            <span className="text-muted-foreground">—</span>
           )}
         </span>
       );
@@ -1200,37 +1456,18 @@ export function LeadsTable({
       );
     }
 
-    if (key === "parseIssues") {
+    if (key === "score") {
       return (
-        <span className="block truncate text-sm">
-          {lead.parseIssues.length > 0 ? (
-            lead.parseIssues.join("; ")
-          ) : (
+        <span
+          className="block truncate text-sm"
+          title={lead.scoreReasoning ?? undefined}
+        >
+          {lead.score == null ? (
             <span className="text-muted-foreground">—</span>
+          ) : (
+            lead.score
           )}
         </span>
-      );
-    }
-
-    if (key === "city") {
-      return (
-        <span className="block truncate text-sm">
-          {lead.address?.city ?? ""}
-        </span>
-      );
-    }
-    if (key === "state") {
-      return (
-        <span className="block truncate text-sm">
-          {lead.address?.state ?? ""}
-        </span>
-      );
-    }
-
-    if (column.type === "date") {
-      const raw = (lead as unknown as Record<string, unknown>)[key];
-      return (
-        <span className="block truncate text-sm">{formatDateTime(raw)}</span>
       );
     }
 
@@ -1312,6 +1549,58 @@ export function LeadsTable({
         />
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <MoreHorizontal aria-hidden="true" />
+                More
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => setColumnsOpen(true)}>
+                <Columns3 aria-hidden="true" />
+                Columns
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setJobsOpen(true)}>
+                <Briefcase aria-hidden="true" />
+                Jobs
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setCreateCampaignOpen(true)}>
+                <Megaphone aria-hidden="true" />
+                New campaign
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                <Upload aria-hidden="true" />
+                Import CSV
+              </DropdownMenuItem>
+              {canExport ? (
+                <DropdownMenuItem onSelect={exportCsv}>
+                  <Download aria-hidden="true" />
+                  Export CSV
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem asChild>
+                  <Link
+                    href="/settings/billing"
+                    title={`CSV export is available on ${exportPlan ?? "a paid plan"} and above`}
+                  >
+                    <Download aria-hidden="true" />
+                    Export CSV (upgrade)
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/leads/settings">
+                  <Settings2 aria-hidden="true" />
+                  Custom fields
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <SavedViewsMenu
             views={views.map((v) => ({
               id: v.id,
@@ -1324,21 +1613,6 @@ export function LeadsTable({
             onSetDefault={(id) => void setDefaultView(id)}
             onDelete={(id) => void deleteView(id)}
           />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Columns
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72 p-2">
-              <ColumnPicker
-                columns={columns.map((c) => ({ key: c.key, label: c.label }))}
-                visibleKeys={visibleColumns}
-                onChange={setVisibleColumns}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           {needsReviewCount > 0 && (
             <Button
@@ -1355,15 +1629,6 @@ export function LeadsTable({
           )}
 
           <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setJobsOpen(true)}
-          >
-            <Briefcase aria-hidden="true" />
-            Jobs
-          </Button>
-
-          <Button
             variant={editMode ? "default" : "outline"}
             size="sm"
             aria-pressed={editMode}
@@ -1374,43 +1639,6 @@ export function LeadsTable({
             <Pencil aria-hidden="true" />
             {editMode ? "Editing…" : "Edit mode"}
           </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <MoreHorizontal aria-hidden="true" />
-                More
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={() => setCreateCampaignOpen(true)}>
-                New campaign
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setImportOpen(true)}>
-                <Upload aria-hidden="true" />
-                Import CSV
-              </DropdownMenuItem>
-              {canExport ? (
-                <DropdownMenuItem onSelect={exportCsv}>
-                  Export CSV
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem asChild>
-                  <Link
-                    href="/settings/billing"
-                    title={`CSV export is available on ${exportPlan ?? "a paid plan"} and above`}
-                  >
-                    Export CSV (upgrade)
-                  </Link>
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/leads/settings">Custom fields</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus aria-hidden="true" />
@@ -1635,9 +1863,9 @@ export function LeadsTable({
       </div>
 
       {/* Table — scroll contained here */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {leads === null ? (
-          <p className="text-muted-foreground text-sm">Loading leads…</p>
+          <TableLoadingSkeleton />
         ) : leads.length === 0 ? (
           <EmptyState
             title="No leads yet"
@@ -1650,24 +1878,28 @@ export function LeadsTable({
             }
           />
         ) : (
-          <div className="min-h-0 flex-1 overflow-auto rounded-md border">
-            <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-8">
+          <div className="relative min-h-0 flex-1 overflow-auto rounded-md border">
+            <TableLoadingOverlay show={loading} />
+            <table className="w-full caption-bottom text-sm">
+            <TableHeader className="bg-background sticky top-0 z-10">
+              <TableRow className="border-border hover:bg-background border-b">
+                <TableHead className="bg-background sticky top-0 z-10 w-8">
                   <Checkbox
                     checked={allPageSelected}
                     aria-label="Select all on page"
                     onChange={(e) => togglePage(e.target.checked)}
                   />
                 </TableHead>
-                <TableHead className="text-muted-foreground w-10 text-right font-medium">
+                <TableHead className="bg-background text-muted-foreground sticky top-0 z-10 w-10 text-right font-medium">
                   #
                 </TableHead>
                 {shownColumns.map((column) => {
                   const hasFilter = filterSpecs[column.key] !== undefined;
                   return (
-                    <TableHead key={column.key} className="whitespace-nowrap">
+                    <TableHead
+                      key={column.key}
+                      className="bg-background sticky top-0 z-10 whitespace-nowrap"
+                    >
                       <div className="flex items-center gap-1">
                         {column.sortable ? (
                           <SortableHeader
@@ -1771,10 +2003,26 @@ export function LeadsTable({
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </table>
         </div>
         )}
       </div>
+
+      <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Visible columns</DialogTitle>
+            <DialogDescription>
+              Choose which columns appear in the table.
+            </DialogDescription>
+          </DialogHeader>
+          <ColumnPicker
+            columns={columns.map((c) => ({ key: c.key, label: c.label }))}
+            visibleKeys={visibleColumns}
+            onChange={setVisibleColumns}
+          />
+        </DialogContent>
+      </Dialog>
 
       {leads !== null && leads.length > 0 && (
         <div className="shrink-0">

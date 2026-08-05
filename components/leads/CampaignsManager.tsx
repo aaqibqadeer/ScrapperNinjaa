@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { TableLoadingSkeleton } from "@/components/shared/TableLoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Campaign } from "@/lib/db/schema";
+import {
+  cachedJsonFetch,
+  invalidateFetchCache,
+  peekFetchCache,
+} from "@/lib/client/fetch-cache";
 
 /**
  * Campaigns list with inline create, edit name/description, archive/reactivate,
@@ -36,10 +42,16 @@ export function CampaignsManager() {
   const [editBusy, setEditBusy] = useState(false);
 
   async function load() {
-    const res = await fetch("/api/campaigns");
-    if (res.ok) {
-      const data = (await res.json()) as { campaigns: Campaign[] };
-      setCampaigns(data.campaigns);
+    const cached = peekFetchCache<{ campaigns: Campaign[] }>("/api/campaigns");
+    if (cached) {
+      setCampaigns(cached.campaigns);
+      return;
+    }
+    const result = await cachedJsonFetch<{ campaigns: Campaign[] }>(
+      "/api/campaigns",
+    );
+    if (result.ok) {
+      setCampaigns(result.data.campaigns);
     } else {
       setCampaigns([]);
       toast.error("Could not load campaigns");
@@ -71,6 +83,7 @@ export function CampaignsManager() {
       setCampaigns((prev) => [data.campaign!, ...(prev ?? [])]);
       setName("");
       toast.success(`Created "${data.campaign.name}"`);
+      invalidateFetchCache("/api/campaigns");
     } finally {
       setBusy(false);
     }
@@ -110,6 +123,7 @@ export function CampaignsManager() {
           null,
       );
       toast.success("Campaign updated");
+      invalidateFetchCache("/api/campaigns");
       setEditCampaign(null);
     } finally {
       setEditBusy(false);
@@ -133,6 +147,7 @@ export function CampaignsManager() {
     setCampaigns(
       (prev) => prev?.map((c) => (c.id === id ? data.campaign! : c)) ?? null,
     );
+    invalidateFetchCache("/api/campaigns");
   }
 
   async function remove(id: string) {
@@ -143,6 +158,7 @@ export function CampaignsManager() {
       return;
     }
     setCampaigns((prev) => prev?.filter((c) => c.id !== id) ?? null);
+    invalidateFetchCache("/api/campaigns");
     toast.success("Campaign deleted");
   }
 
@@ -167,7 +183,7 @@ export function CampaignsManager() {
       </div>
 
       {campaigns === null ? (
-        <p className="text-muted-foreground text-sm">Loading campaigns…</p>
+        <TableLoadingSkeleton rows={4} />
       ) : campaigns.length === 0 ? (
         <EmptyState
           title="No campaigns yet"

@@ -7,7 +7,9 @@ import { toast } from "sonner";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { RowNumberCell } from "@/components/shared/RowNumberCell";
+import { TableLoadingSkeleton } from "@/components/shared/TableLoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
+import { cachedJsonFetch, peekFetchCache } from "@/lib/client/fetch-cache";
 import { formatDateTime } from "@/lib/format/datetime";
 import type {
   Campaign,
@@ -41,30 +43,48 @@ export function CaptureSessionsTable() {
 
   useEffect(() => {
     let cancelled = false;
+    const sessionsUrl = "/api/capture-sessions";
+    const campaignsUrl = "/api/campaigns";
+    const cachedSessions = peekFetchCache<{ sessions?: CaptureSession[] }>(
+      sessionsUrl,
+    );
+    const cachedCampaigns = peekFetchCache<{ campaigns?: Campaign[] }>(
+      campaignsUrl,
+    );
+    if (cachedSessions) setSessions(cachedSessions.sessions ?? []);
+    if (cachedCampaigns) {
+      setCampaignNames(
+        new Map((cachedCampaigns.campaigns ?? []).map((c) => [c.id, c.name])),
+      );
+    }
+    if (cachedSessions && cachedCampaigns) return;
+
     void (async () => {
       const [sessionsRes, campaignsRes] = await Promise.all([
-        fetch("/api/capture-sessions"),
-        fetch("/api/campaigns").catch(() => null),
+        cachedSessions
+          ? Promise.resolve(null)
+          : cachedJsonFetch<{ sessions?: CaptureSession[] }>(sessionsUrl),
+        cachedCampaigns
+          ? Promise.resolve(null)
+          : cachedJsonFetch<{ campaigns?: Campaign[] }>(campaignsUrl).catch(
+              () => null,
+            ),
       ]);
       if (cancelled) return;
-      if (sessionsRes.ok) {
-        const data = (await sessionsRes.json().catch(() => ({}))) as {
-          sessions?: CaptureSession[];
-        };
-        setSessions(data.sessions ?? []);
-      } else {
-        const data = (await sessionsRes.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        setSessions([]);
-        toast.error(data.error ?? "Could not load capture sessions");
+      if (sessionsRes) {
+        if (sessionsRes.ok) {
+          setSessions(sessionsRes.data.sessions ?? []);
+        } else {
+          const data = sessionsRes.data as { error?: string };
+          setSessions([]);
+          toast.error(data.error ?? "Could not load capture sessions");
+        }
       }
       if (campaignsRes?.ok) {
-        const data = (await campaignsRes.json().catch(() => ({}))) as {
-          campaigns?: Campaign[];
-        };
         setCampaignNames(
-          new Map((data.campaigns ?? []).map((c) => [c.id, c.name])),
+          new Map(
+            (campaignsRes.data.campaigns ?? []).map((c) => [c.id, c.name]),
+          ),
         );
       }
     })();
@@ -149,9 +169,7 @@ export function CaptureSessionsTable() {
   ];
 
   if (sessions === null) {
-    return (
-      <p className="text-muted-foreground text-sm">Loading capture sessions…</p>
-    );
+    return <TableLoadingSkeleton rows={5} />;
   }
 
   return (

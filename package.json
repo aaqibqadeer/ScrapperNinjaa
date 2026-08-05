@@ -18,7 +18,8 @@
     "sync:plans": "tsx scripts/sync-plans.ts",
     "hard-delete": "tsx scripts/hard-delete.ts",
     "build:extension": "PRODUCT=scrapperninja npm --prefix extension run build",
-    "build:extension:scrapper": "npm run build:extension"
+    "build:extension:scrapper": "npm run build:extension",
+    "rebuild:extension": "PRODUCT=scrapperninja npm --prefix extension run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",

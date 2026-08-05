@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { TableLoadingSkeleton } from "@/components/shared/TableLoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,11 @@ import {
   type CustomFieldType,
   type LeadCustomField,
 } from "@/lib/db/schema";
+import {
+  cachedJsonFetch,
+  invalidateFetchCache,
+  peekFetchCache,
+} from "@/lib/client/fetch-cache";
 import { cn } from "@/lib/utils";
 
 interface CreateFormState {
@@ -42,10 +48,18 @@ export function CustomFieldManager() {
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const res = await fetch("/api/custom-fields");
-    if (res.ok) {
-      const data = (await res.json()) as { fields: LeadCustomField[] };
-      setFields(data.fields);
+    const cached = peekFetchCache<{ fields: LeadCustomField[] }>(
+      "/api/custom-fields",
+    );
+    if (cached) {
+      setFields(cached.fields);
+      return;
+    }
+    const result = await cachedJsonFetch<{ fields: LeadCustomField[] }>(
+      "/api/custom-fields",
+    );
+    if (result.ok) {
+      setFields(result.data.fields);
     } else {
       setFields([]);
       toast.error("Could not load custom fields");
@@ -86,6 +100,7 @@ export function CustomFieldManager() {
         return;
       }
       setFields((prev) => [...(prev ?? []), data.field!]);
+      invalidateFetchCache("/api/custom-fields");
       setForm(EMPTY_FORM);
       toast.success(`Added custom field "${data.field.label}"`);
     } finally {
@@ -101,6 +116,7 @@ export function CustomFieldManager() {
       return;
     }
     setFields((prev) => prev?.filter((f) => f.id !== id) ?? null);
+    invalidateFetchCache("/api/custom-fields");
     toast.success("Custom field deleted");
   }
 
@@ -109,7 +125,7 @@ export function CustomFieldManager() {
       <section className="flex flex-col gap-3">
         <h2 className="font-heading text-lg font-semibold">Custom fields</h2>
         {fields === null ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
+          <TableLoadingSkeleton rows={4} />
         ) : fields.length === 0 ? (
           <EmptyState
             title="No custom fields yet"

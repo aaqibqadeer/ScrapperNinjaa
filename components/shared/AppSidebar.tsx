@@ -96,9 +96,6 @@ export function AppSidebar({
     });
   }
 
-  const showLeadsSubtitle =
-    features.scraper.enabled && pathname === "/leads";
-
   return (
     <aside
       className={cn(
@@ -123,15 +120,6 @@ export function AppSidebar({
           )}
         </Link>
       </div>
-
-      {!collapsed && showLeadsSubtitle && (
-        <div className="border-border border-b px-4 py-3">
-          <p className="font-heading text-sm font-semibold">Lead Directory</p>
-          <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
-            Every captured business — filter, sort, edit inline, and export.
-          </p>
-        </div>
-      )}
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
         {links.map((link) => {
@@ -169,14 +157,9 @@ export function AppSidebar({
             {userEmail}
           </p>
         )}
-        <div
-          className={cn(
-            "flex items-center gap-1",
-            collapsed ? "flex-col" : "justify-between",
-          )}
-        >
+        {!collapsed ? <LogoutButton /> : <LogoutButton compact />}
+        <div className="flex items-center justify-between gap-1">
           <ThemeToggle />
-          <LogoutButton />
           <button
             type="button"
             onClick={toggleCollapsed}

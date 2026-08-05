@@ -13,9 +13,11 @@ import { z } from "zod";
 import { features } from "@/config/features";
 import type { Session } from "@/lib/auth/types";
 import {
+  businessSizeSchema,
   campaignStatusSchema,
   customFieldTypeSchema,
   db,
+  enrichmentStatusSchema,
   leadAddressSchema,
   LEAD_STATUSES,
   leadSourceTypeSchema,
@@ -23,6 +25,7 @@ import {
   savedViewPageSizeSchema,
   savedViewQuerySchema,
   savedViewSortSchema,
+  websiteStatusSchema,
   type Campaign,
   type Lead,
   type LeadCustomField,
@@ -110,6 +113,13 @@ export const leadPatchSchema = z.object({
   category: z.string().max(200).nullable().optional(),
   emails: z.array(z.string().max(320)).max(50).optional(),
   address: leadAddressSchema.optional(),
+  websiteStatus: websiteStatusSchema.optional(),
+  businessSize: businessSizeSchema.optional(),
+  enrichmentStatus: enrichmentStatusSchema.nullable().optional(),
+  rating: z.number().min(0).max(5).nullable().optional(),
+  reviewCount: z.number().int().min(0).nullable().optional(),
+  score: z.number().min(0).max(100).nullable().optional(),
+  scoreReasoning: z.string().max(5000).nullable().optional(),
   campaignIds: z.array(z.string().min(1)).max(50).optional(),
   customFields: z.record(z.string(), z.unknown()).optional(),
 });
